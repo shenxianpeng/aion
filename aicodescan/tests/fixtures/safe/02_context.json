@@ -1,0 +1,6 @@
+{
+  "orm": "sqlalchemy",
+  "db_patterns": ["session.query()"],
+  "auth_decorators": ["@login_required"],
+  "imports": ["os"]
+}

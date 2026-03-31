@@ -1,5 +1,8 @@
-def main():
-    print("Hello from aicodescan!")
+from aicodescan.cli import app
+
+
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":

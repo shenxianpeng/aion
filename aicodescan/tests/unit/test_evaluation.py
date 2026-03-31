@@ -1,0 +1,62 @@
+from pathlib import Path
+
+from aicodescan.evaluation import FixtureCase, FixturePrediction, compute_metrics, load_fixture_cases
+from aicodescan.models import Finding
+
+
+def test_load_fixture_cases_reads_labels() -> None:
+    cases = load_fixture_cases(Path("tests/fixtures"))
+
+    assert cases
+    assert cases[0].source_path.exists()
+    assert cases[0].context_path.exists()
+
+
+def test_compute_metrics_counts_predictions() -> None:
+    vulnerable_case = FixtureCase(
+        relative_path="vulnerable/demo.py",
+        source_path=Path("vulnerable/demo.py"),
+        context_path=Path("vulnerable/demo_context.json"),
+        has_vuln=True,
+        expected_context_gap="sqlalchemy",
+    )
+    safe_case = FixtureCase(
+        relative_path="safe/demo.py",
+        source_path=Path("safe/demo.py"),
+        context_path=Path("safe/demo_context.json"),
+        has_vuln=False,
+        expected_context_gap="",
+    )
+
+    metrics = compute_metrics(
+        [
+            FixturePrediction(
+                case=vulnerable_case,
+                findings=[
+                    Finding(
+                        issue="demo",
+                        severity="high",
+                        line=1,
+                        context_gap="Project uses sqlalchemy",
+                        fix="Use the ORM",
+                        semgrep_rule=None,
+                    )
+                ],
+                semgrep_findings=[],
+                used_semgrep=False,
+            ),
+            FixturePrediction(
+                case=safe_case,
+                findings=[],
+                semgrep_findings=[],
+                used_semgrep=False,
+            ),
+        ]
+    )
+
+    assert metrics.true_positive == 1
+    assert metrics.true_negative == 1
+    assert metrics.false_positive == 0
+    assert metrics.false_negative == 0
+    assert metrics.precision == 1.0
+    assert metrics.recall == 1.0

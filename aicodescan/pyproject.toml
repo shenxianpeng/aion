@@ -1,13 +1,29 @@
 [project]
 name = "aicodescan"
 version = "0.1.0"
-description = "Add your description here"
+description = "Context-aware AI code security scanner for Python projects"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.86.0",
     "instructor>=1.14.5",
+    "openai>=2.30.0",
+    "pydantic>=2.11.0",
     "rich>=14.3.3",
     "semgrep>=1.156.0",
     "typer>=0.23.1",
+]
+
+[project.scripts]
+aicodescan = "aicodescan.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "eval: live evaluation tests that may call external LLM APIs",
 ]

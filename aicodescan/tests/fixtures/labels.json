@@ -1,0 +1,26 @@
+{
+  "vulnerable/01_raw_sqlite3.py": {
+    "has_vuln": true,
+    "expected_context_gap": "sqlalchemy"
+  },
+  "vulnerable/02_hardcoded_secret.py": {
+    "has_vuln": true,
+    "expected_context_gap": "environment"
+  },
+  "vulnerable/03_missing_auth_decorator.py": {
+    "has_vuln": true,
+    "expected_context_gap": "require_permissions"
+  },
+  "safe/01_orm_correct.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "safe/02_env_secret.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "safe/03_with_auth_decorator.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  }
+}

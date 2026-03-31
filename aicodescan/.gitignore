@@ -1,0 +1,5 @@
+__pycache__/
+.pytest_cache/
+.aicodescan-context.json
+.coverage
+*.pyc
