@@ -3,3 +3,5 @@ __pycache__/
 .aicodescan-context.json
 .coverage
 *.pyc
+
+src/aicodescan.egg-info/
