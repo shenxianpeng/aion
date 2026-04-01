@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aicodeaudit.context_extractor import ContextExtractor
+from aion.context_extractor import ContextExtractor
 
 
 def test_extracts_project_context_and_respects_ignores(tmp_path: Path) -> None:

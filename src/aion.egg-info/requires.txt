@@ -1,0 +1,7 @@
+anthropic>=0.86.0
+instructor>=1.14.5
+openai>=2.30.0
+pydantic>=2.11.0
+rich>=14.3.3
+semgrep>=1.156.0
+typer>=0.23.1

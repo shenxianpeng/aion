@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from aicodeaudit.evaluation import FixtureCase, FixturePrediction, compute_metrics, load_fixture_cases
-from aicodeaudit.models import Finding
+from aion.evaluation import FixtureCase, FixturePrediction, compute_metrics, load_fixture_cases
+from aion.models import Finding
 
 
 def test_load_fixture_cases_reads_labels() -> None:

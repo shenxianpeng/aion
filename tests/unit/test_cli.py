@@ -1,10 +1,10 @@
 from pathlib import Path
 
-import aicodeaudit.cli as cli_module
+import aion.cli as cli_module
 from typer.testing import CliRunner
 
-from aicodeaudit.cli import app
-from aicodeaudit.models import ContextProfile, Finding
+from aion.cli import app
+from aion.models import ContextProfile, Finding
 
 
 def test_scan_requires_anthropic_api_key(monkeypatch, tmp_path: Path) -> None:
@@ -33,7 +33,7 @@ def test_scan_requires_openai_api_key(monkeypatch, tmp_path: Path) -> None:
 
 def test_scan_uses_config_file_provider_and_ignores(monkeypatch, tmp_path: Path) -> None:
     runner = CliRunner()
-    (tmp_path / ".aicodeaudit.yaml").write_text(
+    (tmp_path / ".aion.yaml").write_text(
         "\n".join(
             [
                 "provider: openai",

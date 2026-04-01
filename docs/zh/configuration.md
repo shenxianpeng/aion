@@ -1,6 +1,6 @@
 # 配置
 
-在目标仓库根目录创建 `.aicodeaudit.yaml`。
+在目标仓库根目录创建 `.aion.yaml`。
 
 ## 示例
 
@@ -22,12 +22,12 @@ ignore_paths:
 
 ## 覆盖优先级
 
-命令行参数优先级高于 `.aicodeaudit.yaml`。
+命令行参数优先级高于 `.aion.yaml`。
 
 ## 缓存位置
 
 上下文提取缓存保存在：
 
 ```text
-~/.aicodeaudit-context.json
+~/.aion-context.json
 ```

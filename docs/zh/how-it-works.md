@@ -1,6 +1,6 @@
 # 工作原理
 
-AI Code Audit 是一个分阶段执行的分析流程。
+AION 是一个分阶段执行的自进化分析流程。
 
 ## 1. 识别目标文件
 
@@ -29,7 +29,7 @@ CLI 会从输入路径中解析 Python 文件，并自动排除 `.git`、`.venv`
 
 ## 3. 先跑 Semgrep
 
-如果系统中安装了 `semgrep`，AI Code Audit 会先运行 `p/python` 规则集，
+如果系统中安装了 `semgrep`，AION 会先运行 `p/python` 规则集，
 把它作为低成本的第一轮筛查。
 
 ## 4. 只在必要时升级到 LLM

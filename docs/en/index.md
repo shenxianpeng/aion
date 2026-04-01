@@ -1,6 +1,8 @@
-# AI Code Audit
+# AION
 
-AI Code Audit is a context-aware CLI for auditing AI-generated Python code.
+**Code Once, Live Forever.**
+
+AION is The Self-Evolving Code Engine — designed to end technical debt and keep your codebase in a perpetual state of health.
 
 Instead of treating every file in isolation, it builds a lightweight profile of the
 existing repository, uses `semgrep` as a fast first pass, and only asks the LLM to
@@ -15,7 +17,7 @@ conventions in ways that increase security risk:
 - Missing auth decorators in handlers that should follow an established access pattern
 - Hardcoded secrets where the rest of the repository loads credentials from the environment
 
-AI Code Audit is designed to catch that mismatch between a generated file and the
+AION is designed to catch that mismatch between a generated file and the
 rest of the repository.
 
 ## Core capabilities

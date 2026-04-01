@@ -1,6 +1,6 @@
 # Configuration
 
-Place a `.aicodeaudit.yaml` file in the target repository root.
+Place a `.aion.yaml` file in the target repository root.
 
 ## Example
 
@@ -22,12 +22,12 @@ ignore_paths:
 
 ## Override order
 
-CLI flags take precedence over `.aicodeaudit.yaml`.
+CLI flags take precedence over `.aion.yaml`.
 
 ## Cache
 
 Context extraction results are cached at:
 
 ```text
-~/.aicodeaudit-context.json
+~/.aion-context.json
 ```

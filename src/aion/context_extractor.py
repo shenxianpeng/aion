@@ -52,7 +52,7 @@ class ContextExtractor:
     ):
         self.root = root.resolve()
         self.max_files = max_files
-        self.cache_path = cache_path or Path.home() / ".aicodeaudit-context.json"
+        self.cache_path = cache_path or Path.home() / ".aion-context.json"
         self._cache = self._load_cache()
         self._ignore_patterns = self._load_gitignore_patterns()
         self._ignore_patterns.extend(extra_ignore_patterns or [])

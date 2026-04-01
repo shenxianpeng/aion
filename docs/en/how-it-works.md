@@ -1,6 +1,6 @@
 # How It Works
 
-AI Code Audit is built as a staged pipeline.
+AION is built as a staged pipeline.
 
 ## 1. Identify target files
 
@@ -29,7 +29,7 @@ That repository profile is what makes context-gap reporting possible.
 
 ## 3. Run Semgrep first
 
-If `semgrep` is installed, AI Code Audit runs it as a fast initial pass and collects
+If `semgrep` is installed, AION runs it as a fast initial pass and collects
 structured findings from `p/python`.
 
 ## 4. Escalate to LLM analysis only when needed

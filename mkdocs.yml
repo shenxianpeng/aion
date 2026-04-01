@@ -1,8 +1,8 @@
-site_name: AI Code Audit
-site_description: Context-aware security auditing for AI-generated Python code.
-site_url: https://shenxianpeng.github.io/aicodeaudit/
-repo_url: https://github.com/shenxianpeng/aicodeaudit
-repo_name: shenxianpeng/aicodeaudit
+site_name: AION
+site_description: The Self-Evolving Code Engine. Code Once, Live Forever.
+site_url: https://shenxianpeng.github.io/aion/
+repo_url: https://github.com/shenxianpeng/aion
+repo_name: shenxianpeng/aion
 edit_uri: edit/main/docs/
 
 theme:
@@ -77,9 +77,9 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/shenxianpeng/aicodeaudit
+      link: https://github.com/shenxianpeng/aion
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/aicodeaudit/
+      link: https://pypi.org/project/aion/
   generator: false
 
-copyright: MIT License · AI Code Audit
+copyright: MIT License · AION

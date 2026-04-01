@@ -3,32 +3,32 @@
 ## Scan a repository
 
 ```bash
-uv run aicodeaudit scan ./path/to/project
+uv run aion scan ./path/to/project
 ```
 
 ## Scan known AI-generated files only
 
 ```bash
-uv run aicodeaudit scan ./path/to/project \
+uv run aion scan ./path/to/project \
   --ai-generated ./path/to/project/generated_file.py
 ```
 
 ## Use OpenAI instead of Anthropic
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --provider openai
+uv run aion scan ./path/to/project --provider openai
 ```
 
 ## Emit JSON
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --output json
+uv run aion scan ./path/to/project --output json
 ```
 
 ## Verbose mode
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --verbose
+uv run aion scan ./path/to/project --verbose
 ```
 
 Verbose mode prints the extracted context profile, Semgrep findings, fallback reasons,

@@ -3,32 +3,32 @@
 ## 扫描整个仓库
 
 ```bash
-uv run aicodeaudit scan ./path/to/project
+uv run aion scan ./path/to/project
 ```
 
 ## 只扫描已知的 AI 生成文件
 
 ```bash
-uv run aicodeaudit scan ./path/to/project \
+uv run aion scan ./path/to/project \
   --ai-generated ./path/to/project/generated_file.py
 ```
 
 ## 切换到 OpenAI
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --provider openai
+uv run aion scan ./path/to/project --provider openai
 ```
 
 ## 输出 JSON
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --output json
+uv run aion scan ./path/to/project --output json
 ```
 
 ## 输出详细调试信息
 
 ```bash
-uv run aicodeaudit scan ./path/to/project --verbose
+uv run aion scan ./path/to/project --verbose
 ```
 
 `--verbose` 会把上下文提取结果、Semgrep 结果、fallback 原因和 token 估算输出到 stderr。

@@ -18,7 +18,7 @@ from .models import Finding, ProjectScanSummary, ScanReport, normalize_path
 from .risk_heuristics import fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
 
-app = typer.Typer(help="AI Code Audit: context-aware security auditing for AI-generated code.", no_args_is_help=True)
+app = typer.Typer(help="AION: The Self-Evolving Code Engine. Code Once, Live Forever.", no_args_is_help=True)
 stderr_console = Console(stderr=True)
 stdout_console = Console()
 
@@ -38,7 +38,7 @@ class Provider(str, Enum):
 
 @app.callback()
 def main() -> None:
-    """AI Code Audit: context-aware security auditing for AI-generated code."""
+    """AION: The Self-Evolving Code Engine. Code Once, Live Forever."""
 
 
 @app.command()
@@ -193,7 +193,7 @@ def _provider_from_config(config: AppConfig) -> Provider | None:
     try:
         return Provider(config.provider)
     except ValueError as exc:
-        raise typer.BadParameter(f"unsupported provider in .aicodeaudit.yaml: {config.provider}") from exc
+        raise typer.BadParameter(f"unsupported provider in .aion.yaml: {config.provider}") from exc
 
 
 def _expand_explicit_targets(targets: list[Path]) -> set[str]:
@@ -264,13 +264,13 @@ def _exit_with_summary(summary: ProjectScanSummary, output: str) -> None:
         stderr_console.print(f"[yellow]warning:[/yellow] {warning}")
 
     if summary.files_scanned == 0:
-        stdout_console.print(Panel("No Python files were scanned.", title="AI Code Audit"))
+        stdout_console.print(Panel("No Python files were scanned.", title="AION"))
         raise typer.Exit(code=0)
 
     stdout_console.print(
         Panel(
             f"Target: {summary.target}\nFiles scanned: {summary.files_scanned}\nFindings: {summary.finding_count}",
-            title="AI Code Audit",
+            title="AION",
         )
     )
 

@@ -1,5 +1,5 @@
-from aicodeaudit.llm_analyzer import LLMAnalyzer
-from aicodeaudit.models import Finding
+from aion.llm_analyzer import LLMAnalyzer
+from aion.models import Finding
 
 
 def test_chunk_source_splits_large_files() -> None:

@@ -5,14 +5,14 @@ hide:
 ---
 
 <div class="aca-hero">
-  <div class="aca-hero__eyebrow">security audit · ai-generated code · context-aware</div>
+  <div class="aca-hero__eyebrow">self-evolving · end technical debt · code once, live forever</div>
   <div class="aca-hero__headline">
-    AI Code Audit
-    <span class="aca-accent">for generated Python code.</span>
+    AION
+    <span class="aca-accent">The Self-Evolving Code Engine.</span>
   </div>
   <p class="aca-hero__sub">
-    A focused CLI that combines repository context, Semgrep, and LLM analysis to
-    audit AI-generated Python code with fewer generic false positives.
+    AI scans your code continuously, automatically rewrites outdated syntax and risky logic,
+    and delivers an evolved codebase every day — keeping your repository perpetually healthy.
   </p>
   <div class="aca-hero__facts">
     <span class="aca-hero__fact">Python-first</span>

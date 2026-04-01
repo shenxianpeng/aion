@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aicodeaudit.evaluation import compute_metrics, evaluate_cases, load_fixture_cases
+from aion.evaluation import compute_metrics, evaluate_cases, load_fixture_cases
 
 
 def _resolve_eval_provider() -> tuple[str, str]:

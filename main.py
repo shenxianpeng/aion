@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-from aicodeaudit.cli import app
+from aion.cli import app
 
 
 def main() -> None:

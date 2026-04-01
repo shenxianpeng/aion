@@ -9,8 +9,8 @@
 ## Local setup
 
 ```bash
-git clone https://github.com/shenxianpeng/aicodeaudit.git
-cd aicodeaudit
+git clone https://github.com/shenxianpeng/aion.git
+cd aion
 uv sync --dev
 ```
 
@@ -31,5 +31,5 @@ export OPENAI_API_KEY=your_key
 ## Verify the CLI
 
 ```bash
-uv run aicodeaudit --help
+uv run aion --help
 ```

@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aicodeaudit"
+name = "aion"
 dynamic = ["version"]
-description = "Context-aware security audit CLI for AI-generated Python code"
+description = "AION: The Self-Evolving Code Engine. Code Once, Live Forever."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -19,12 +19,12 @@ dependencies = [
 ]
 
 [project.scripts]
-aicodeaudit = "aicodeaudit.cli:app"
+aion = "aion.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/shenxianpeng/aicodeaudit"
-Documentation = "https://shenxianpeng.github.io/aicodeaudit/"
-"Bug Tracker" = "https://github.com/shenxianpeng/aicodeaudit/issues"
+Homepage = "https://github.com/shenxianpeng/aion"
+Documentation = "https://shenxianpeng.github.io/aion/"
+"Bug Tracker" = "https://github.com/shenxianpeng/aion/issues"
 
 [dependency-groups]
 dev = [
