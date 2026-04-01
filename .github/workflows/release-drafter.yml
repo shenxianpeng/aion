@@ -16,4 +16,4 @@ jobs:
     steps:
       - uses: release-drafter/release-drafter@139054aeaa9adc52ab36ddf67437541f039b88e2  # v7.1.1
         with:
-          config-name: release-drafter.yml
+          config-name: github:shenxianpeng/.github:/.github/release-drafter.yml
