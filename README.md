@@ -48,6 +48,7 @@ uv run aion create-release-candidate ./.aion/inbox/results/<event>.json --releas
 uv run aion approve-release <candidate-id> --approver alice --releases-root ./.aion/releases
 uv run aion advance-release <candidate-id> --releases-root ./.aion/releases
 uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
+uv run aion serve-webhook --inbox-root ./.aion/inbox --host 127.0.0.1 --port 8080
 ```
 
 ## Config File
@@ -86,6 +87,7 @@ CLI flags still override config values.
 - `.aion.yaml` now controls auto-repair issue allowlists, minimum confidence, and sandbox mode (`file` or `repository`) for orchestration commands.
 - `process-event-queue` processes a JSON array of events, persists per-event results, and reports aggregate queue metrics.
 - `enqueue-event`, `list-inbox`, and `process-inbox` provide a persistent file-backed inbox so orchestration can consume events incrementally instead of only from ad hoc JSON arrays.
+- `serve-webhook` exposes `POST /events` and writes accepted payloads straight into the inbox for near-real-time orchestration.
 - Sandbox orchestration can now run project-specific verification commands and emit a rollout recommendation: `approved_for_rollout`, `rollback`, or `needs_human_review`.
 - `create-release-candidate`, `approve-release`, `advance-release`, `reject-release`, and `rollback-release` implement a staged rollout state machine with canary/broad/full phases.
 - `plan-defense` emits runtime-first containment actions such as gateway blocks, WAF rules, feature flags, dependency pins, and code patch follow-ups.

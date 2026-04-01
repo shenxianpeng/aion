@@ -39,6 +39,7 @@ from .repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 from .release_manager import ReleaseManager
 from .risk_heuristics import fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
+from .webhook import WebhookEventServer
 
 app = typer.Typer(help="AION: The Self-Evolving Code Engine. Code Once, Live Forever.", no_args_is_help=True)
 stderr_console = Console(stderr=True)
@@ -421,6 +422,25 @@ def plan_defense(
         context_profile = _load_context_profile_for_event(result.event, None)
         result = orchestrator.process_event(result.event, context_profile, repo_root=event_root)
     _exit_with_defense_plan(result.defense_plan, output)
+
+
+@app.command("serve-webhook")
+def serve_webhook(
+    inbox_root: Path = typer.Option(Path(".aion/inbox"), "--inbox-root", resolve_path=True),
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8080, "--port"),
+    max_events: int | None = typer.Option(None, "--max-events", min=1),
+) -> None:
+    server = WebhookEventServer((host, port), inbox_root)
+    server.max_events = max_events
+    stdout_console.print(Panel(f"Listening on http://{host}:{server.server_port}/events", title="AION Webhook"))
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    raise typer.Exit(code=0)
 
 
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:

@@ -69,6 +69,11 @@ uv run aion process-inbox \
   --inbox-root ./.aion/inbox \
   --output json
 
+uv run aion serve-webhook \
+  --inbox-root ./.aion/inbox \
+  --host 127.0.0.1 \
+  --port 8080
+
 uv run aion create-release-candidate ./.aion/inbox/results/<event>.json \
   --releases-root ./.aion/releases
 
@@ -92,6 +97,7 @@ The current autonomy release generates patch artifacts and verifies them locally
 `process-event` is the staged orchestration entrypoint. It accepts an event payload, applies policy gating, and only runs approved remediations inside a sandbox workspace.
 `process-event-queue` accepts a JSON array of events and reports queue-level metrics while persisting one result file per event.
 The inbox commands provide a persistent event queue under `.aion/inbox`, so runtime alerts can be enqueued and processed incrementally.
+`serve-webhook` exposes `POST /events` and stores accepted events in the inbox for asynchronous processing.
 The release commands persist staged rollout candidates under `.aion/releases` and support approval, phased advancement, rejection, and rollback.
 `plan-defense` renders runtime containment actions that should be applied before or alongside code rollout, such as gateway blocks, WAF rules, feature flags, and dependency pins.
 
