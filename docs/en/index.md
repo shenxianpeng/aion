@@ -1,35 +1,44 @@
-# AION
+# AION Overview
 
-**Code Once, Live Forever.**
+AION is an autonomous code-immunity system for Python services. It starts with
+context-aware security scanning and extends into deterministic remediation,
+sandbox verification, event orchestration, staged release control, and
+runtime-first containment planning.
 
-AION is The Self-Evolving Code Engine — designed to end technical debt and keep your codebase in a perpetual state of health.
+## Current release
 
-Instead of treating every file in isolation, it builds a lightweight profile of the
-existing repository, uses `semgrep` as a fast first pass, and only asks the LLM to
-investigate files that have concrete risk signals or meaningful context gaps.
+| Area | What is implemented |
+|---|---|
+| Detection | Repository context extraction, Semgrep triage, fallback heuristics, optional LLM explanation |
+| Repair | Deterministic patch artifacts for raw SQLite interpolation, hardcoded secrets, and missing auth decorators |
+| Verification | Syntax checks, Semgrep re-scan, built-in assertions, staged project commands |
+| Control plane | JSON event ingestion, persistent inbox, queue processing, webhook ingress |
+| Rollout | Release candidate creation, approval, phased advancement, rejection, rollback |
+| Defense | Runtime containment planning for gateway, WAF, feature flags, dependency actions, and code follow-up |
 
-## Why this exists
+## Operating model
 
-AI-generated code often looks locally reasonable while drifting away from project
-conventions in ways that increase security risk:
+1. Scan a repository or ingest an event.
+2. Convert findings into structured incidents.
+3. Generate a patch artifact instead of mutating the live repository.
+4. Stage the patch inside a sandbox and verify it.
+5. Persist the result as an inbox item, orchestration record, or release candidate.
+6. Produce rollout and runtime-defense recommendations.
 
-- Raw `sqlite3` usage in a codebase that otherwise standardizes on ORM sessions
-- Missing auth decorators in handlers that should follow an established access pattern
-- Hardcoded secrets where the rest of the repository loads credentials from the environment
+## What AION is for
 
-AION is designed to catch that mismatch between a generated file and the
-rest of the repository.
+- Reviewing AI-generated or newly introduced Python changes against repository conventions
+- Building a local control plane for autonomous repair experiments
+- Testing policy-gated remediation before integrating real production adapters
+- Capturing auditable repair, verification, and rollout state as JSON artifacts
 
-## Core capabilities
+## What AION does not do yet
 
-- Scans Python files and repositories from the command line
-- Detects AI-generated files via markers, Git history, or explicit targeting
-- Extracts repository context using static analysis
-- Runs `semgrep --config p/python` as a fast rule-based pass
-- Uses an LLM to explain security findings in repository context
-- Reports context gaps, fixes, and JSON output for automation
+- Hot-patch production code in place
+- Push directly to deployment systems, WAF providers, or feature flag services
+- Support non-Python languages in the current release
 
-## Read next
+## Continue reading
 
 - [Installation](installation.md)
 - [Usage](usage.md)

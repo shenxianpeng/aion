@@ -27,7 +27,6 @@ theme:
     - navigation.instant
     - navigation.instant.progress
     - navigation.top
-    - navigation.tabs
     - navigation.sections
     - navigation.footer
     - content.code.copy
@@ -40,6 +39,9 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/language-switcher.js
+
 nav:
   - Home: index.md
   - English:
@@ -48,12 +50,14 @@ nav:
     - Usage: en/usage.md
     - Configuration: en/configuration.md
     - How It Works: en/how-it-works.md
+    - Roadmap: en/roadmap.md
   - 中文:
     - 概览: zh/index.md
     - 安装: zh/installation.md
     - 使用: zh/usage.md
     - 配置: zh/configuration.md
     - 工作原理: zh/how-it-works.md
+    - 路线图: zh/roadmap.md
 
 plugins:
   - search

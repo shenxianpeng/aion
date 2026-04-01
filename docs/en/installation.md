@@ -3,20 +3,32 @@
 ## Requirements
 
 - Python 3.11 or newer
-- `uv` for environment management
-- Optional: `semgrep` for the rule-based first pass
+- `uv` for local environment management, or `pip` for package installation
+- Optional: `semgrep` for the fast rules-based first pass
 
-## Local setup
+## Install from PyPI
+
+```bash
+pip install aion-evolve
+```
+
+or
+
+```bash
+uv tool install aion-evolve
+```
+
+## Install from source
 
 ```bash
 git clone https://github.com/shenxianpeng/aion.git
 cd aion
-uv sync --dev
+uv sync --group dev --group docs
 ```
 
-## API keys
+## Configure API access
 
-Choose at least one provider:
+`scan` requires at least one provider API key:
 
 ```bash
 export ANTHROPIC_API_KEY=your_key
@@ -32,4 +44,10 @@ export OPENAI_API_KEY=your_key
 
 ```bash
 uv run aion --help
+```
+
+## Optional documentation preview
+
+```bash
+uv run mkdocs serve
 ```

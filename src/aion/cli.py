@@ -279,23 +279,7 @@ def process_event_queue(
         context_profile = context_loader(event)
         result = orchestrator.process_event(event, context_profile, repo_root=repo_root)
         results.append(result)
-<<<<<<< HEAD
         _accumulate_queue_summary(summary, result)
-=======
-        if result.policy.action == "auto_repair_sandbox":
-            summary.auto_repair_count += 1
-        elif result.policy.action == "needs_human_review":
-            summary.human_review_count += 1
-        elif result.policy.action == "blocked":
-            summary.blocked_count += 1
-        if result.sandbox is not None and result.sandbox.verification is not None and result.sandbox.verification.verdict == "verified_fix":
-            summary.verified_count += 1
-        if result.sandbox is not None and result.sandbox.rollout is not None:
-            if result.sandbox.rollout.recommendation == "approved_for_rollout":
-                summary.approved_count += 1
-            elif result.sandbox.rollout.recommendation == "rollback":
-                summary.rollback_count += 1
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
         if results_dir is not None:
             results_dir.mkdir(parents=True, exist_ok=True)
             result_path = results_dir / f"{event.event_id}.json"
@@ -305,8 +289,6 @@ def process_event_queue(
 
     _exit_with_event_queue_results(results, summary, output)
 
-
-<<<<<<< HEAD
 @app.command("enqueue-event")
 def enqueue_event(
     event_file: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
@@ -458,10 +440,6 @@ def serve_webhook(
     finally:
         server.server_close()
     raise typer.Exit(code=0)
-
-
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
     extra_ignore_patterns = extra_ignore_patterns or []
     if target.is_file():
@@ -649,8 +627,6 @@ def _build_orchestrator(root: Path) -> Orchestrator:
     config = load_app_config(root)
     return Orchestrator.from_config(config)
 
-
-<<<<<<< HEAD
 def _accumulate_queue_summary(summary: EventQueueSummary, result: OrchestrationResult) -> None:
     if result.policy.action == "auto_repair_sandbox":
         summary.auto_repair_count += 1
@@ -666,9 +642,6 @@ def _accumulate_queue_summary(summary: EventQueueSummary, result: OrchestrationR
         elif result.sandbox.rollout.recommendation == "rollback":
             summary.rollback_count += 1
 
-
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 def _build_repair_session(target: Path, context_profile: ContextProfile) -> RepairSession:
     detector = IncidentDetector()
     generator = PatchGenerator()
@@ -822,11 +795,8 @@ def _exit_with_orchestration_result(result: OrchestrationResult, output: str) ->
             for command in result.sandbox.command_results:
                 commands.add_row(command.command, "yes" if command.passed else "no", str(command.exit_code))
             stdout_console.print(commands)
-<<<<<<< HEAD
     if result.defense_plan is not None:
         _render_defense_plan(result.defense_plan)
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 
     for warning in result.warnings:
         stderr_console.print(f"[yellow]warning:[/yellow] {warning}")
@@ -879,8 +849,6 @@ def _exit_with_event_queue_results(results: list[OrchestrationResult], summary: 
     stdout_console.print(table)
     raise typer.Exit(code=0)
 
-
-<<<<<<< HEAD
 def _exit_with_inbox_item(item: InboxItem, output: str) -> None:
     if output == "json":
         stdout_console.print_json(item.model_dump_json())
@@ -971,10 +939,6 @@ def _render_defense_plan(defense_plan) -> None:
         for note in defense_plan.notes:
             notes.add_row(note)
         stdout_console.print(notes)
-
-
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 def _exit_with_repair_eval(results, metrics, output: str) -> None:
     payload = {
         "metrics": metrics.summary_payload(),

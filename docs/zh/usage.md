@@ -1,136 +1,202 @@
 # 使用
 
-## 扫描整个仓库
+## 前置条件
+
+- 运行 `scan` 前先设置 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`
+- 如果希望统一策略和 sandbox 默认值，请在目标仓库根目录放置 `.aion.yaml`
+- 需要机器可读输出时使用 `--output json`
+
+## 1. 扫描仓库
 
 ```bash
 uv run aion scan ./path/to/project
 ```
 
-## 只扫描已知的 AI 生成文件
+只扫描你已经确认是 AI 生成的文件：
 
 ```bash
 uv run aion scan ./path/to/project \
   --ai-generated ./path/to/project/generated_file.py
 ```
 
-## 切换到 OpenAI
+切换 provider 或输出 JSON：
 
 ```bash
-uv run aion scan ./path/to/project --provider openai
+uv run aion scan ./path/to/project --provider openai --output json
 ```
 
-## 输出 JSON
-
-```bash
-uv run aion scan ./path/to/project --output json
-```
-
-## 输出详细调试信息
+输出上下文提取、fallback 原因和 Semgrep 细节：
 
 ```bash
 uv run aion scan ./path/to/project --verbose
 ```
 
-修复与验证闭环：
+## 2. 生成并验证修复 artifact
+
+创建确定性 patch artifact，并把审计记录一起落盘：
 
 ```bash
 uv run aion repair ./path/to/file.py \
   --context-file ./context.json \
   --artifact-path ./artifact.json \
   --record-path ./repair-record.json
+```
 
+验证已有 artifact：
+
+```bash
 uv run aion verify --artifact-path ./artifact.json
+```
 
+对单个文件运行完整 incident 流程：
+
+```bash
 uv run aion run-incident ./path/to/file.py \
   --context-file ./context.json \
   --record-path ./incident-record.json \
   --output json
+```
 
+在 fixture 上评估确定性修复质量：
+
+```bash
 uv run aion repair-eval ./tests/fixtures \
   --records-dir ./repair-records \
   --output json
+```
 
+## 3. 在 sandbox 中编排事件
+
+处理单个事件：
+
+```bash
 uv run aion process-event ./event.json \
   --result-path ./orchestration.json \
   --output json
+```
 
+批量处理事件数组：
+
+```bash
 uv run aion process-event-queue ./events.json \
   --results-dir ./queue-results \
   --output json
-<<<<<<< HEAD
+```
 
+典型事件 payload：
+
+```json
+{
+  "event_id": "runtime-001",
+  "event_type": "runtime_alert",
+  "target_file": "/absolute/path/to/service.py",
+  "metadata": {
+    "repo_root": "/absolute/path/to/repo",
+    "context_file": "/absolute/path/to/context.json"
+  }
+}
+```
+
+当前版本支持的事件类型：
+
+- `code_scan`
+- `runtime_alert`
+- `dependency_alert`
+
+## 4. 使用持久化 inbox 和 webhook
+
+把事件写入文件型 inbox：
+
+```bash
 uv run aion enqueue-event ./event.json \
   --inbox-root ./.aion/inbox
+```
 
+查看待处理或已处理事件：
+
+```bash
 uv run aion list-inbox \
   --inbox-root ./.aion/inbox \
   --status pending
+```
 
+处理当前所有 pending 事件：
+
+```bash
 uv run aion process-inbox \
   --inbox-root ./.aion/inbox \
   --output json
+```
 
+启动 webhook 接收器：
+
+```bash
 uv run aion serve-webhook \
   --inbox-root ./.aion/inbox \
   --host 127.0.0.1 \
   --port 8080
+```
 
+webhook 会接收 `POST /events`，并把合法 payload 写入 inbox。
+
+## 5. 管理 staged rollout
+
+从成功的 orchestration result 创建 release candidate：
+
+```bash
 uv run aion create-release-candidate ./.aion/inbox/results/<event>.json \
   --releases-root ./.aion/releases
+```
 
+查看当前 candidate：
+
+```bash
+uv run aion list-releases --releases-root ./.aion/releases
+```
+
+批准并向下一阶段推进：
+
+```bash
 uv run aion approve-release <candidate-id> \
   --approver alice \
   --releases-root ./.aion/releases
 
 uv run aion advance-release <candidate-id> \
   --releases-root ./.aion/releases
+```
+
+拒绝或回滚：
+
+```bash
+uv run aion reject-release <candidate-id> \
+  --approver alice \
+  --reason "review failed" \
+  --releases-root ./.aion/releases
 
 uv run aion rollback-release <candidate-id> \
   --reason "failed canary metrics" \
   --releases-root ./.aion/releases
-
-uv run aion plan-defense ./.aion/inbox/results/<event>.json \
-  --output json
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 ```
 
-当前首版自治能力只生成补丁 artifact 并在本地验证，不会直接原地改写生产文件。
-`repair-eval` 会批量运行确定性修复流水线，并输出修复成功率、验证通过率、误修率和回滚率。
-`process-event` 是当前控制平面原型入口：它接收事件 payload，做策略门控，并只在 sandbox 工作区里执行获批修复。
-`process-event-queue` 接收一个事件数组，批量执行编排，并为每个事件落盘结果，同时输出队列级指标。
-<<<<<<< HEAD
-inbox 命令提供了持久化事件队列 `.aion/inbox`，让运行时告警可以先入队，再按批次增量处理。
-`serve-webhook` 会暴露 `POST /events`，把收到的事件直接写入 inbox，供后续异步编排处理。
-release 命令会在 `.aion/releases` 下保存 staged rollout candidate，并支持批准、分阶段推进、拒绝和回滚。
-`plan-defense` 会输出运行时优先的防护动作，比如 gateway block、WAF rule、feature flag、dependency pin，以及后续 code patch。
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
+## 6. 规划运行时防护动作
 
-`.aion.yaml` 里的编排配置示例：
+基于 orchestration result 生成运行时防护建议：
 
-```yaml
-auto_repair_issue_types:
-  - raw_sqlite_query
-  - hardcoded_secret
-auto_repair_min_confidence: 0.90
-sandbox_mode: repository
-sandbox_verification_commands:
-  - python -m pytest tests/unit
-auto_approve_verified_fixes: false
-rollback_on_verification_failure: true
+```bash
+uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
 ```
 
-配置了 `sandbox_verification_commands` 后，AION 会在 staged workspace 内执行这些项目级验证命令，并记录每条命令的退出码、stdout/stderr，以及最终发布建议：
-- `approved_for_rollout`：sandbox 验证通过且启用了自动批准
-- `rollback`：验证失败且启用了失败即回滚
-- `needs_human_review`：其余情况
+当前 defense planner 可输出：
 
-`--verbose` 会把上下文提取结果、Semgrep 结果、fallback 原因和 token 估算输出到 stderr。
+- gateway block
+- WAF rule
+- feature flag 动作
+- dependency pin 建议
+- code patch follow-up 动作
 
-## 推荐使用流程
+## 运行说明
 
-1. 指向一个仓库或一个已生成文件。
-2. 让工具自动识别候选 Python 文件。
-3. 查看 AI 文件识别和 `semgrep` 可用性的 warning。
-4. 重点阅读 context-aware 的问题解释和修复建议。
+- 当前版本生成的是 patch artifact，不会直接原地改写生产文件。
+- `sandbox_verification_commands` 只会在 staged workspace 中执行，不会在你的工作树里直接运行。
+- `process-event` 和 inbox 处理会自动从事件仓库根目录加载 `.aion.yaml`。
+- `repair-eval` 会输出修复成功率、验证通过率、误修率和回滚率。

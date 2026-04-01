@@ -8,10 +8,7 @@ import tempfile
 from pathlib import Path
 
 from .config import AppConfig
-<<<<<<< HEAD
 from .defense import RuntimeDefensePlanner
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
 from .models import (
     CommandExecutionResult,
     ContextProfile,
@@ -122,16 +119,11 @@ class SandboxExecutor:
             artifact_path = Path(artifact.target_file)
             try:
                 relative_target = artifact_path.relative_to(repo_root)
-<<<<<<< HEAD
             except ValueError as exc:
                 raise ValueError(
                     f"In 'repository' sandbox mode, artifact.target_file must be within repo_root "
                     f"({repo_root}); got {artifact_path}"
                 ) from exc
-=======
-            except ValueError:
-                relative_target = Path(artifact_path.name)
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
             target_path = staged_repo / relative_target
         else:
             staged_repo = workspace
@@ -218,33 +210,6 @@ class Orchestrator:
         self.policy_engine = policy_engine or PolicyEngine()
         self.sandbox_executor = sandbox_executor or SandboxExecutor(self.verifier)
         self.defense_planner = defense_planner or RuntimeDefensePlanner()
-
-    @classmethod
-    def from_config(
-        cls,
-        config: AppConfig,
-        detector: IncidentDetector | None = None,
-        generator: PatchGenerator | None = None,
-        verifier: Verifier | None = None,
-    ) -> "Orchestrator":
-        policy_engine = PolicyEngine(
-            auto_repair_issue_types=set(config.auto_repair_issue_types),
-            min_confidence=config.auto_repair_min_confidence,
-        )
-        sandbox_executor = SandboxExecutor(
-            verifier=verifier,
-            mode=config.sandbox_mode,  # type: ignore[arg-type]
-            verification_commands=config.sandbox_verification_commands,
-            auto_approve_verified_fixes=config.auto_approve_verified_fixes,
-            rollback_on_verification_failure=config.rollback_on_verification_failure,
-        )
-        return cls(
-            detector=detector,
-            generator=generator,
-            verifier=verifier,
-            policy_engine=policy_engine,
-            sandbox_executor=sandbox_executor,
-        )
 
     @classmethod
     def from_config(

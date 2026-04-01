@@ -8,62 +8,102 @@
 
 > **Code Once, Live Forever.**
 
-`AION` is The Self-Evolving Code Engine — designed to end technical debt and keep your codebase in a perpetual state of health.
+AION is an autonomous code-immunity control plane for Python services. It turns
+repository scanning into a staged remediation workflow: detect incidents,
+generate deterministic patches, verify them in isolated sandboxes, orchestrate
+events through queues and webhooks, and produce rollout plus runtime-defense
+decisions.
 
-AI scans your code continuously, automatically rewrites outdated syntax and risky logic, and delivers an evolved codebase every day. Instead of treating every file in isolation, it builds a lightweight profile of the existing repository, runs `semgrep` as a fast first pass, and only asks the LLM to investigate files that have concrete risk signals or meaningful context gaps. The main differentiator is context-gap reporting, for example: "this file uses `sqlite3`, but the rest of the project uses `sqlalchemy` sessions."
+## What Ships Today
 
-## Current Capabilities
+- Context-aware Python scanning with repository profiling, Semgrep triage, and optional LLM explanation
+- Deterministic remediation for `raw_sqlite_query`, `hardcoded_secret`, and `missing_auth_decorator`
+- Verification with syntax checks, Semgrep re-scan, built-in assertions, and staged project commands
+- Event-driven control-plane primitives: inbox, webhook ingress, queue processing, sandbox orchestration
+- Release candidate management with approval, phased rollout, rejection, and rollback
+- Runtime containment planning covering gateway blocks, WAF rules, feature flags, dependency pins, and code-patch follow-up
 
-- Python-only scanning
-- Project context extraction via `ast`
-- `semgrep --config p/python` integration
-- Anthropic-backed structured findings
-- Anthropic and OpenAI providers
-- AI-generated file detection via file markers, git history, or explicit `--ai-generated`
-- Rich terminal output and JSON output
-- Deterministic remediation planning for high-confidence Python issues
-- Patch artifact generation and standalone verification
-- Persistent inbox and webhook ingress for event-driven orchestration
-- Policy-gated sandbox execution with project-level verification commands
-- Release candidate state machine with staged rollout and rollback handling
-- Runtime-first defense planning covering gateway, WAF, feature flags, dependency pins, and code patch follow-ups
+## Architecture
 
-## Install
+| Layer | Implemented capabilities |
+|---|---|
+| Sensor | Repository scan, JSON event ingestion, persistent inbox, webhook `POST /events` |
+| Decision | Incident detection, remediation planning, policy gating, rollout recommendation |
+| Execution | Patch artifact generation, file or repository sandbox staging, verification command execution |
+| Assurance | Repair records, queue metrics, release candidates, rollback decisions, runtime defense plans |
+
+## Installation
+
+Install from PyPI:
 
 ```bash
-uv sync
+pip install aion-evolve
 ```
 
-## Usage
+Or install as a `uv` tool:
 
 ```bash
-export ANTHROPIC_API_KEY=your_key
-uv run aion scan ./path/to/project
-uv run aion scan ./path/to/project --ai-generated ./path/to/project/generated_file.py
-uv run aion scan ./path/to/project --output json
+uv tool install aion-evolve
+```
+
+For local development:
+
+```bash
+git clone https://github.com/shenxianpeng/aion.git
+cd aion
+uv sync --group dev --group docs
+uv run aion --help
+```
+
+## Quick Start
+
+Choose at least one LLM provider for `scan`:
+
+```bash
 export OPENAI_API_KEY=your_key
-uv run aion scan ./path/to/project --provider openai
-uv run aion repair ./path/to/file.py --context-file ./context.json --artifact-path ./artifact.json
-uv run aion verify --artifact-path ./artifact.json
-uv run aion run-incident ./path/to/file.py --context-file ./context.json --output json
-uv run aion repair-eval ./tests/fixtures --records-dir ./repair-records --output json
-uv run aion process-event ./event.json --result-path ./orchestration.json --output json
-uv run aion process-event-queue ./events.json --results-dir ./queue-results --output json
-<<<<<<< HEAD
-uv run aion enqueue-event ./event.json --inbox-root ./.aion/inbox
-uv run aion process-inbox --inbox-root ./.aion/inbox --output json
-uv run aion create-release-candidate ./.aion/inbox/results/<event>.json --releases-root ./.aion/releases
-uv run aion approve-release <candidate-id> --approver alice --releases-root ./.aion/releases
-uv run aion advance-release <candidate-id> --releases-root ./.aion/releases
-uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
-uv run aion serve-webhook --inbox-root ./.aion/inbox --host 127.0.0.1 --port 8080
-=======
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
+# or
+export ANTHROPIC_API_KEY=your_key
 ```
 
-## Config File
+Scan a repository:
 
-Create `.aion.yaml` in the project root:
+```bash
+aion scan ./path/to/repo --output json
+```
+
+If you are running from the cloned repository instead of an installed package,
+use `uv run aion ...`.
+
+Plan and verify a deterministic repair:
+
+```bash
+aion repair ./path/to/file.py \
+  --context-file ./context.json \
+  --artifact-path ./artifact.json \
+  --record-path ./repair-record.json
+
+aion verify --artifact-path ./artifact.json
+```
+
+Process an orchestration event inside a sandbox:
+
+```bash
+aion process-event ./event.json \
+  --result-path ./orchestration.json \
+  --output json
+```
+
+Promote a verified result into staged rollout control:
+
+```bash
+aion create-release-candidate ./.aion/inbox/results/<event>.json
+aion approve-release <candidate-id> --approver alice
+aion advance-release <candidate-id>
+```
+
+## Configuration
+
+Place `.aion.yaml` in the target repository root:
 
 ```yaml
 provider: openai
@@ -74,6 +114,7 @@ ignore_paths:
 auto_repair_issue_types:
   - raw_sqlite_query
   - hardcoded_secret
+  - missing_auth_decorator
 auto_repair_min_confidence: 0.90
 sandbox_mode: repository
 sandbox_verification_commands:
@@ -82,49 +123,48 @@ auto_approve_verified_fixes: false
 rollback_on_verification_failure: true
 ```
 
-CLI flags still override config values.
+CLI flags override equivalent settings from `.aion.yaml`.
 
-## Notes
+## Command Surface
 
-- If `semgrep` is unavailable, the tool degrades to LLM-only mode and prints a warning.
-- If no AI-generated markers are found, the tool scans all Python files and prints a warning.
-- Context extraction cache is stored at `~/.aion-context.json`.
-- Provider-specific defaults: Anthropic uses `claude-3-5-sonnet-latest`; OpenAI uses `gpt-4.1` unless `--model` is set.
-- The first autonomy release does not modify production code or apply patches in place; it emits patch artifacts and verifies them locally.
-- Deterministic auto-repair currently covers raw sqlite f-string queries, hardcoded secrets, and missing auth decorators.
-- `repair` and `run-incident` can persist full repair attempt records for auditability, and `repair-eval` reports repair success, verification pass, false-fix, and rollback rates.
-- `process-event` is the current control-plane prototype: it ingests an event payload, applies policy gating, and runs approved remediations in a sandbox workspace.
-- `.aion.yaml` now controls auto-repair issue allowlists, minimum confidence, and sandbox mode (`file` or `repository`) for orchestration commands.
-- `process-event-queue` processes a JSON array of events, persists per-event results, and reports aggregate queue metrics.
-<<<<<<< HEAD
-- `enqueue-event`, `list-inbox`, and `process-inbox` provide a persistent file-backed inbox so orchestration can consume events incrementally instead of only from ad hoc JSON arrays.
-- `serve-webhook` exposes `POST /events` and writes accepted payloads straight into the inbox for near-real-time orchestration.
-- Sandbox orchestration can now run project-specific verification commands and emit a rollout recommendation: `approved_for_rollout`, `rollback`, or `needs_human_review`.
-- `create-release-candidate`, `approve-release`, `advance-release`, `reject-release`, and `rollback-release` implement a staged rollout state machine with canary/broad/full phases.
-- `plan-defense` emits runtime-first containment actions such as gateway blocks, WAF rules, feature flags, dependency pins, and code patch follow-ups.
+Core analysis:
 
-## Roadmap Status
+- `aion scan`
+- `aion repair`
+- `aion verify`
+- `aion run-incident`
+- `aion repair-eval`
 
-- Detection and context-aware incident generation: implemented
-- Deterministic repair, verification, and repair evaluation: implemented
-- Policy-gated orchestration, inbox/webhook ingress, sandbox execution, and queue processing: implemented
-- Release candidate approval, staged rollout, rollback, and runtime containment planning: implemented in the local control plane
-- Real production integrations such as external queues, gateways, WAF APIs, feature flag providers, and live deploy systems remain adapter work on top of the shipped interfaces
-=======
-- Sandbox orchestration can now run project-specific verification commands and emit a rollout recommendation: `approved_for_rollout`, `rollback`, or `needs_human_review`.
->>>>>>> 1963707 (Add queued sandbox verification and rollout policy controls)
+Control plane:
 
-## Tests
+- `aion process-event`
+- `aion process-event-queue`
+- `aion enqueue-event`
+- `aion list-inbox`
+- `aion process-inbox`
+- `aion serve-webhook`
 
-```bash
-uv run pytest tests/unit
-uv run pytest -m eval tests/eval
-```
+Release and defense:
+
+- `aion create-release-candidate`
+- `aion list-releases`
+- `aion approve-release`
+- `aion reject-release`
+- `aion advance-release`
+- `aion rollback-release`
+- `aion plan-defense`
 
 ## Documentation
 
-Full documentation is published with GitHub Pages:
+Documentation is published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/).
+The docs site now includes a language drop-down in the header for English and
+中文 switching.
 
-- English: `docs/en/`
-- 中文: `docs/zh/`
-- Site URL: `https://shenxianpeng.github.io/aion/`
+- [English docs](https://shenxianpeng.github.io/aion/en/)
+- [中文文档](https://shenxianpeng.github.io/aion/zh/)
+
+## Current Scope
+
+- AION produces patch artifacts and staged decisions. It does not hot-patch live production code in place.
+- External integrations for production queues, gateways, WAF providers, feature flags, and deployment systems remain adapter work on top of the shipped interfaces.
+- The current implementation is Python-only by design.
