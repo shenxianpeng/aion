@@ -70,7 +70,9 @@ class EventInbox:
 
     def _write_item(self, item: InboxItem) -> None:
         path = self.events_dir / f"{item.item_id}.json"
-        path.write_text(item.model_dump_json(indent=2), encoding="utf-8")
+        tmp_path = self.events_dir / f"{item.item_id}.json.tmp"
+        tmp_path.write_text(item.model_dump_json(indent=2), encoding="utf-8")
+        tmp_path.replace(path)
 
     def _item_id(self, event: OrchestrationEvent) -> str:
         digest = hashlib.sha256(f"{event.event_id}:{event.target_file}".encode("utf-8")).hexdigest()

@@ -106,8 +106,11 @@ class ReleaseManager:
 
     def _write_candidate(self, candidate: ReleaseCandidate) -> None:
         path = self.root / f"{candidate.candidate_id}.json"
-        path.write_text(candidate.model_dump_json(indent=2), encoding="utf-8")
+        temp_path = self.root / f".{candidate.candidate_id}.json.tmp"
+        temp_path.write_text(candidate.model_dump_json(indent=2), encoding="utf-8")
+        temp_path.replace(path)
 
     def _candidate_id(self, event_id: str, target_file: str) -> str:
-        digest = hashlib.sha256(f"{event_id}:{target_file}".encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        digest = hashlib.sha256(f"{event_id}:{target_file}:{now}".encode("utf-8")).hexdigest()
         return digest[:14]

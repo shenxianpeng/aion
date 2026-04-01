@@ -119,8 +119,11 @@ class SandboxExecutor:
             artifact_path = Path(artifact.target_file)
             try:
                 relative_target = artifact_path.relative_to(repo_root)
-            except ValueError:
-                relative_target = Path(artifact_path.name)
+            except ValueError as exc:
+                raise ValueError(
+                    f"In 'repository' sandbox mode, artifact.target_file must be within repo_root "
+                    f"({repo_root}); got {artifact_path}"
+                ) from exc
             target_path = staged_repo / relative_target
         else:
             staged_repo = workspace
@@ -287,6 +290,7 @@ class Orchestrator:
         result.artifact = artifact
         if artifact is None:
             result.warnings.append("Policy approved sandbox remediation, but no patch artifact was generated.")
+            result.defense_plan = self.defense_planner.plan(event, incidents, rollout=None)
             return result
 
         sandbox = self.sandbox_executor.execute(artifact, repo_root=repo_root)

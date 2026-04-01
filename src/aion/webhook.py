@@ -24,7 +24,18 @@ def _build_handler(server: WebhookEventServer):
                 self.send_error(404, "Not Found")
                 return
 
-            length = int(self.headers.get("Content-Length", "0"))
+            length_header = self.headers.get("Content-Length")
+            if length_header is None:
+                self.send_error(400, "Missing Content-Length header")
+                return
+            try:
+                length = int(length_header)
+            except ValueError:
+                self.send_error(400, "Invalid Content-Length header")
+                return
+            if length < 0:
+                self.send_error(400, "Invalid Content-Length header")
+                return
             raw_body = self.rfile.read(length)
             try:
                 payload = json.loads(raw_body.decode("utf-8"))
