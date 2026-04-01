@@ -157,10 +157,11 @@ Release and defense:
 ## Documentation
 
 Documentation is published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/).
-The docs site now includes a language drop-down in the header for English and
-中文 switching.
+The docs site uses native Material for MkDocs language switching backed by the
+`mkdocs-static-i18n` plugin, so the language selector and sidebar navigation are
+generated per locale instead of being patched in with custom JavaScript.
 
-- [English docs](https://shenxianpeng.github.io/aion/en/)
+- [English docs](https://shenxianpeng.github.io/aion/)
 - [中文文档](https://shenxianpeng.github.io/aion/zh/)
 
 ## Current Scope

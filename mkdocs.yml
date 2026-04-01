@@ -7,6 +7,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  language: en
   font:
     text: false
     code: false
@@ -24,8 +25,6 @@ theme:
         icon: material/brightness-7
         name: Switch to light mode
   features:
-    - navigation.instant
-    - navigation.instant.progress
     - navigation.top
     - navigation.sections
     - navigation.footer
@@ -36,31 +35,37 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
-extra_css:
-  - stylesheets/extra.css
-
-extra_javascript:
-  - javascripts/language-switcher.js
-
 nav:
-  - Home: index.md
-  - English:
-    - Overview: en/index.md
-    - Installation: en/installation.md
-    - Usage: en/usage.md
-    - Configuration: en/configuration.md
-    - How It Works: en/how-it-works.md
-    - Roadmap: en/roadmap.md
-  - 中文:
-    - 概览: zh/index.md
-    - 安装: zh/installation.md
-    - 使用: zh/usage.md
-    - 配置: zh/configuration.md
-    - 工作原理: zh/how-it-works.md
-    - 路线图: zh/roadmap.md
+  - Overview: index.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - Configuration: configuration.md
+  - How It Works: how-it-works.md
+  - Roadmap: roadmap.md
 
 plugins:
   - search
+  - i18n:
+      docs_structure: folder
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          build: true
+          default: true
+          link: /
+        - locale: zh
+          name: 中文
+          build: true
+          link: /zh/
+          nav_translations:
+            Overview: 概览
+            Installation: 安装
+            Usage: 使用
+            Configuration: 配置
+            How It Works: 工作原理
+            Roadmap: 路线图
 
 markdown_extensions:
   - admonition
@@ -83,7 +88,7 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/shenxianpeng/aion
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/aion/
+      link: https://pypi.org/project/aion-evolve/
   generator: false
 
 copyright: MIT License · AION
