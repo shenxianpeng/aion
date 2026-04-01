@@ -36,16 +36,23 @@ Repair and verification flow:
 ```bash
 uv run aion repair ./path/to/file.py \
   --context-file ./context.json \
-  --artifact-path ./artifact.json
+  --artifact-path ./artifact.json \
+  --record-path ./repair-record.json
 
 uv run aion verify --artifact-path ./artifact.json
 
 uv run aion run-incident ./path/to/file.py \
   --context-file ./context.json \
+  --record-path ./incident-record.json \
+  --output json
+
+uv run aion repair-eval ./tests/fixtures \
+  --records-dir ./repair-records \
   --output json
 ```
 
 The current autonomy release generates patch artifacts and verifies them locally. It does not rewrite production files in place.
+`repair-eval` runs the deterministic repair pipeline across fixture cases and reports repair success rate, verification pass rate, false-fix rate, and rollback rate.
 
 Verbose mode prints the extracted context profile, Semgrep findings, fallback reasons,
 and token estimates to stderr.

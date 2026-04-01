@@ -39,6 +39,7 @@ uv run aion scan ./path/to/project --provider openai
 uv run aion repair ./path/to/file.py --context-file ./context.json --artifact-path ./artifact.json
 uv run aion verify --artifact-path ./artifact.json
 uv run aion run-incident ./path/to/file.py --context-file ./context.json --output json
+uv run aion repair-eval ./tests/fixtures --records-dir ./repair-records --output json
 ```
 
 ## Config File
@@ -63,6 +64,7 @@ CLI flags still override config values.
 - Provider-specific defaults: Anthropic uses `claude-3-5-sonnet-latest`; OpenAI uses `gpt-4.1` unless `--model` is set.
 - The first autonomy release does not modify production code or apply patches in place; it emits patch artifacts and verifies them locally.
 - Deterministic auto-repair currently covers raw sqlite f-string queries, hardcoded secrets, and missing auth decorators.
+- `repair` and `run-incident` can persist full repair attempt records for auditability, and `repair-eval` reports repair success, verification pass, false-fix, and rollback rates.
 
 ## Tests
 

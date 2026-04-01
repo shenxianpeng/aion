@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 from aion.cli import app
 from aion.models import ContextProfile
 from aion.orchestrator import Orchestrator
-from aion.repair import IncidentDetector, PatchGenerator, Verifier
+from aion.repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 
 
 def _load_context(path: str) -> ContextProfile:
@@ -74,6 +74,22 @@ def test_orchestrator_runs_incident_end_to_end(monkeypatch: pytest.MonkeyPatch) 
     assert result.verification.verdict == "verified_fix"
 
 
+def test_repair_executor_records_attempt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = Path("tests/fixtures/vulnerable/01_raw_sqlite3.py")
+    context = _load_context("tests/fixtures/vulnerable/01_context.json")
+    executor = RepairExecutor()
+
+    record = executor.run(target, context, verify=True)
+    record_path = tmp_path / "records" / "sqlite.json"
+    executor.write_record(record, record_path)
+
+    assert record.artifact is not None
+    assert record.verification is not None
+    assert record.verification.verdict == "verified_fix"
+    assert json.loads(record_path.read_text(encoding="utf-8"))["verification"]["verdict"] == "verified_fix"
+
+
 def test_cli_repair_verify_and_run_incident_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
     runner = CliRunner()
@@ -105,3 +121,21 @@ def test_cli_repair_verify_and_run_incident_json(monkeypatch: pytest.MonkeyPatch
     assert run_result.exit_code == 0
     run_payload = json.loads(run_result.stdout)
     assert run_payload["verification"]["verdict"] == "verified_fix"
+
+
+def test_cli_repair_eval_outputs_metrics_and_records(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    runner = CliRunner()
+    records_dir = tmp_path / "repair-eval-records"
+
+    result = runner.invoke(
+        app,
+        ["repair-eval", "tests/fixtures", "--records-dir", str(records_dir), "--output", "json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["metrics"]["repair_success_count"] == 3
+    assert payload["metrics"]["verification_pass_count"] == 3
+    assert payload["metrics"]["false_fix_count"] == 0
+    assert len(list(records_dir.glob("*.json"))) == 6

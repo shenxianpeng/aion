@@ -5,12 +5,14 @@ import difflib
 import hashlib
 import re
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import (
     ContextProfile,
     Incident,
     PatchArtifact,
+    RepairAttemptRecord,
     RemediationPlan,
     VerificationCheck,
     VerificationResult,
@@ -401,3 +403,47 @@ class Verifier:
                     reasons.append("Auth decorator was not injected into the route declaration.")
 
         return not reasons, {"checks": checks, "reasons": reasons}
+
+
+class RepairExecutor:
+    def __init__(
+        self,
+        detector: IncidentDetector | None = None,
+        generator: PatchGenerator | None = None,
+        verifier: Verifier | None = None,
+    ):
+        self.detector = detector or IncidentDetector()
+        self.generator = generator or PatchGenerator()
+        self.verifier = verifier or Verifier()
+
+    def run(
+        self,
+        target: Path,
+        context_profile: ContextProfile,
+        verify: bool = True,
+    ) -> RepairAttemptRecord:
+        incidents = self.detector.detect(target, context_profile)
+        artifact = self.generator.generate(target, incidents, context_profile)
+        warnings: list[str] = []
+        if not incidents:
+            warnings.append("No actionable incidents were detected.")
+        if incidents and artifact is None:
+            warnings.append("Incidents were detected, but no deterministic patch could be generated.")
+
+        verification = None
+        if verify and artifact is not None:
+            verification = self.verifier.verify(artifact)
+
+        return RepairAttemptRecord(
+            target=normalize_path(target),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            context_profile=context_profile,
+            incidents=incidents,
+            artifact=artifact,
+            verification=verification,
+            warnings=warnings,
+        )
+
+    def write_record(self, record: RepairAttemptRecord, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(record.model_dump_json(indent=2), encoding="utf-8")

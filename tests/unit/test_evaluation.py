@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from aion.evaluation import FixtureCase, FixturePrediction, compute_metrics, load_fixture_cases
+from aion.evaluation import (
+    FixtureCase,
+    FixturePrediction,
+    compute_metrics,
+    compute_repair_metrics,
+    evaluate_repair_cases,
+    load_fixture_cases,
+)
 from aion.models import Finding
 
 
@@ -60,3 +67,22 @@ def test_compute_metrics_counts_predictions() -> None:
     assert metrics.false_negative == 0
     assert metrics.precision == 1.0
     assert metrics.recall == 1.0
+
+
+def test_compute_repair_metrics_counts_results(monkeypatch) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    cases = load_fixture_cases(Path("tests/fixtures"))
+
+    results = evaluate_repair_cases(cases, verify=True)
+    metrics = compute_repair_metrics(results)
+
+    assert metrics.vulnerable_total == 3
+    assert metrics.safe_total == 3
+    assert metrics.repair_success_count == 3
+    assert metrics.verification_pass_count == 3
+    assert metrics.false_fix_count == 0
+    assert metrics.rollback_count == 0
+    assert metrics.repair_success_rate == 1.0
+    assert metrics.verification_pass_rate == 1.0
+    assert metrics.false_fix_rate == 0.0
+    assert metrics.rollback_rate == 0.0

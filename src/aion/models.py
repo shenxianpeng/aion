@@ -115,6 +115,16 @@ class VerificationResult(BaseModel):
     status: IncidentStatus = "verified"
 
 
+class RepairAttemptRecord(BaseModel):
+    target: str
+    created_at: str
+    context_profile: ContextProfile
+    incidents: list[Incident] = Field(default_factory=list)
+    artifact: PatchArtifact | None = None
+    verification: VerificationResult | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ScanReport(BaseModel):
     file: str
     findings: list[Finding] = Field(default_factory=list)

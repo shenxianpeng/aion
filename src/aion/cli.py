@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -13,12 +14,14 @@ from rich.table import Table
 
 from .config import AppConfig, ConfigError, load_app_config
 from .context_extractor import ContextExtractor
+from .evaluation import compute_repair_metrics, evaluate_repair_cases, load_fixture_cases
 from .llm_analyzer import LLMAnalyzer, LLMAnalyzerError
 from .models import (
     ContextProfile,
     Finding,
     PatchArtifact,
     ProjectScanSummary,
+    RepairAttemptRecord,
     RepairSession,
     RunIncidentResult,
     ScanReport,
@@ -26,7 +29,7 @@ from .models import (
     normalize_path,
 )
 from .orchestrator import Orchestrator
-from .repair import IncidentDetector, PatchGenerator, Verifier
+from .repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 from .risk_heuristics import fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
 
@@ -159,6 +162,7 @@ def repair(
     target: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
     context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
     artifact_path: Path | None = typer.Option(None, "--artifact-path", resolve_path=True),
+    record_path: Path | None = typer.Option(None, "--record-path", resolve_path=True),
     output: str = typer.Option("text", "--output", help="text or json"),
     plan_only: bool = typer.Option(True, "--plan/--apply", help="Emit a patch artifact without modifying the file."),
 ) -> None:
@@ -166,10 +170,12 @@ def repair(
         raise typer.BadParameter("Only --plan is supported in the first autonomy release.")
 
     context_profile = _load_context_profile(target, context_file)
-    session = _build_repair_session(target, context_profile)
-    if artifact_path and session.artifact is not None:
-        artifact_path.write_text(session.model_dump_json(indent=2), encoding="utf-8")
-    _exit_with_repair_session(session, output)
+    record = RepairExecutor().run(target, context_profile, verify=False)
+    if artifact_path is not None:
+        _write_record(record, artifact_path)
+    if record_path is not None:
+        _write_record(record, record_path)
+    _exit_with_repair_record(record, output)
 
 
 @app.command()
@@ -178,7 +184,7 @@ def verify(
     output: str = typer.Option("text", "--output", help="text or json"),
 ) -> None:
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))
-    artifact = PatchArtifact(**payload["artifact"])
+    artifact = _artifact_from_payload(payload)
     verification = Verifier().verify(artifact)
     _exit_with_verification(verification, output)
 
@@ -188,13 +194,28 @@ def run_incident(
     target: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
     context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
     artifact_path: Path | None = typer.Option(None, "--artifact-path", resolve_path=True),
+    record_path: Path | None = typer.Option(None, "--record-path", resolve_path=True),
     output: str = typer.Option("text", "--output", help="text or json"),
 ) -> None:
     context_profile = _load_context_profile(target, context_file)
     result = Orchestrator().run_incident(target, context_profile)
     if artifact_path and result.session.artifact is not None:
         artifact_path.write_text(result.session.model_dump_json(indent=2), encoding="utf-8")
+    if record_path is not None:
+        _write_record(_record_from_run_result(result, context_profile), record_path)
     _exit_with_run_incident(result, output)
+
+
+@app.command("repair-eval")
+def repair_eval(
+    fixtures_root: Path = typer.Argument(Path("tests/fixtures"), exists=True, readable=True, resolve_path=True),
+    records_dir: Path | None = typer.Option(None, "--records-dir", resolve_path=True),
+    output: str = typer.Option("text", "--output", help="text or json"),
+) -> None:
+    cases = load_fixture_cases(fixtures_root)
+    results = evaluate_repair_cases(cases, verify=True, records_dir=records_dir)
+    metrics = compute_repair_metrics(results)
+    _exit_with_repair_eval(results, metrics, output)
 
 
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
@@ -377,16 +398,16 @@ def _build_repair_session(target: Path, context_profile: ContextProfile) -> Repa
     return RepairSession(target=normalize_path(target), incidents=incidents, artifact=artifact, warnings=warnings)
 
 
-def _exit_with_repair_session(session: RepairSession, output: str) -> None:
+def _exit_with_repair_record(record: RepairAttemptRecord, output: str) -> None:
     if output == "json":
-        stdout_console.print_json(session.model_dump_json())
+        stdout_console.print_json(record.model_dump_json())
         raise typer.Exit(code=0)
 
-    for warning in session.warnings:
+    for warning in record.warnings:
         stderr_console.print(f"[yellow]warning:[/yellow] {warning}")
 
-    if not session.incidents:
-        stdout_console.print(Panel(f"Target: {session.target}\nNo actionable incidents detected.", title="AION Repair"))
+    if not record.incidents:
+        stdout_console.print(Panel(f"Target: {record.target}\nNo actionable incidents detected.", title="AION Repair"))
         raise typer.Exit(code=0)
 
     incident_table = Table(title="Planned Incidents")
@@ -394,7 +415,7 @@ def _exit_with_repair_session(session: RepairSession, output: str) -> None:
     incident_table.add_column("Severity")
     incident_table.add_column("Line", justify="right")
     incident_table.add_column("Strategy")
-    for incident in session.incidents:
+    for incident in record.incidents:
         incident_table.add_row(
             incident.issue_type,
             incident.severity,
@@ -403,12 +424,12 @@ def _exit_with_repair_session(session: RepairSession, output: str) -> None:
         )
     stdout_console.print(incident_table)
 
-    if session.artifact is None:
+    if record.artifact is None:
         stdout_console.print("[yellow]No patch artifact generated.[/yellow]")
         raise typer.Exit(code=0)
 
-    stdout_console.print(Panel(f"Target: {session.target}\nApplied plans: {len(session.artifact.plans)}", title="Patch Artifact"))
-    stdout_console.print(session.artifact.diff or "[yellow]No diff produced.[/yellow]")
+    stdout_console.print(Panel(f"Target: {record.target}\nApplied plans: {len(record.artifact.plans)}", title="Patch Artifact"))
+    stdout_console.print(record.artifact.diff or "[yellow]No diff produced.[/yellow]")
     raise typer.Exit(code=0)
 
 
@@ -460,6 +481,79 @@ def _exit_with_run_incident(result: RunIncidentResult, output: str) -> None:
             )
         )
     raise typer.Exit(code=0)
+
+
+def _exit_with_repair_eval(results, metrics, output: str) -> None:
+    payload = {
+        "metrics": metrics.summary_payload(),
+        "results": [
+            {
+                "case": result.case.relative_path,
+                "has_vuln": result.case.has_vuln,
+                "artifact_generated": result.artifact_generated,
+                "verification_passed": result.verification_passed,
+                "verdict": result.record.verification.verdict if result.record.verification is not None else None,
+            }
+            for result in results
+        ],
+    }
+    if output == "json":
+        stdout_console.print_json(json.dumps(payload))
+        raise typer.Exit(code=0)
+
+    stdout_console.print(
+        Panel(
+            (
+                f"Repair success rate: {metrics.repair_success_rate:.2%}\n"
+                f"Verification pass rate: {metrics.verification_pass_rate:.2%}\n"
+                f"False-fix rate: {metrics.false_fix_rate:.2%}\n"
+                f"Rollback rate: {metrics.rollback_rate:.2%}"
+            ),
+            title="AION Repair Eval",
+        )
+    )
+    table = Table(title="Repair Eval Cases")
+    table.add_column("Case")
+    table.add_column("Vulnerable")
+    table.add_column("Artifact")
+    table.add_column("Verified")
+    table.add_column("Verdict")
+    for result in results:
+        table.add_row(
+            result.case.relative_path,
+            "yes" if result.case.has_vuln else "no",
+            "yes" if result.artifact_generated else "no",
+            "yes" if result.verification_passed else "no",
+            result.record.verification.verdict if result.record.verification is not None else "-",
+        )
+    stdout_console.print(table)
+    raise typer.Exit(code=0)
+
+
+def _artifact_from_payload(payload: dict[str, object]) -> PatchArtifact:
+    if "artifact" in payload:
+        return PatchArtifact(**payload["artifact"])
+    if "session" in payload and isinstance(payload["session"], dict) and payload["session"].get("artifact") is not None:
+        return PatchArtifact(**payload["session"]["artifact"])
+    if "verification" in payload and isinstance(payload["verification"], dict) and payload["verification"].get("artifact") is not None:
+        return PatchArtifact(**payload["verification"]["artifact"])
+    return PatchArtifact(**payload)
+
+
+def _record_from_run_result(result: RunIncidentResult, context_profile: ContextProfile) -> RepairAttemptRecord:
+    return RepairAttemptRecord(
+        target=result.session.target,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        context_profile=context_profile,
+        incidents=result.session.incidents,
+        artifact=result.session.artifact,
+        verification=result.verification,
+        warnings=result.session.warnings,
+    )
+
+
+def _write_record(record: RepairAttemptRecord, destination: Path) -> None:
+    RepairExecutor().write_record(record, destination)
 
 
 def _severity_sort_key(finding: Finding) -> tuple[int, int]:

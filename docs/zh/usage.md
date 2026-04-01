@@ -36,16 +36,23 @@ uv run aion scan ./path/to/project --verbose
 ```bash
 uv run aion repair ./path/to/file.py \
   --context-file ./context.json \
-  --artifact-path ./artifact.json
+  --artifact-path ./artifact.json \
+  --record-path ./repair-record.json
 
 uv run aion verify --artifact-path ./artifact.json
 
 uv run aion run-incident ./path/to/file.py \
   --context-file ./context.json \
+  --record-path ./incident-record.json \
+  --output json
+
+uv run aion repair-eval ./tests/fixtures \
+  --records-dir ./repair-records \
   --output json
 ```
 
 当前首版自治能力只生成补丁 artifact 并在本地验证，不会直接原地改写生产文件。
+`repair-eval` 会批量运行确定性修复流水线，并输出修复成功率、验证通过率、误修率和回滚率。
 
 `--verbose` 会把上下文提取结果、Semgrep 结果、fallback 原因和 token 估算输出到 stderr。
 

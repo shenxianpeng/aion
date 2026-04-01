@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 
 from .llm_analyzer import LLMAnalyzer, LLMAnalyzerError
-from .models import ContextProfile, Finding, SemgrepFinding
+from .models import ContextProfile, Finding, RepairAttemptRecord, SemgrepFinding
+from .repair import RepairExecutor
 from .risk_heuristics import fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
 
@@ -47,6 +49,62 @@ class EvalMetrics:
     def recall(self) -> float:
         denominator = self.true_positive + self.false_negative
         return self.true_positive / denominator if denominator else 1.0
+
+
+@dataclass(frozen=True)
+class RepairFixtureResult:
+    case: FixtureCase
+    record: RepairAttemptRecord
+
+    @property
+    def artifact_generated(self) -> bool:
+        return self.record.artifact is not None
+
+    @property
+    def verification_passed(self) -> bool:
+        return self.record.verification is not None and self.record.verification.verdict == "verified_fix"
+
+    @property
+    def rolled_back(self) -> bool:
+        return self.record.verification is not None and self.record.verification.verdict == "unsafe_patch"
+
+
+@dataclass(frozen=True)
+class RepairEvalMetrics:
+    vulnerable_total: int
+    safe_total: int
+    repair_success_count: int
+    verification_pass_count: int
+    false_fix_count: int
+    rollback_count: int
+
+    @property
+    def repair_success_rate(self) -> float:
+        return self.repair_success_count / self.vulnerable_total if self.vulnerable_total else 1.0
+
+    @property
+    def verification_pass_rate(self) -> float:
+        return self.verification_pass_count / self.vulnerable_total if self.vulnerable_total else 1.0
+
+    @property
+    def false_fix_rate(self) -> float:
+        return self.false_fix_count / self.safe_total if self.safe_total else 0.0
+
+    @property
+    def rollback_rate(self) -> float:
+        return self.rollback_count / self.vulnerable_total if self.vulnerable_total else 0.0
+
+    def summary_payload(self) -> dict[str, int | float]:
+        payload = asdict(self)
+        payload.update(
+            {
+                "repair_success_rate": self.repair_success_rate,
+                "verification_pass_rate": self.verification_pass_rate,
+                "false_fix_rate": self.false_fix_rate,
+                "rollback_rate": self.rollback_rate,
+            }
+        )
+        return payload
 
 
 def load_fixture_cases(fixtures_root: Path) -> list[FixtureCase]:
@@ -139,4 +197,39 @@ def compute_metrics(predictions: list[FixturePrediction]) -> EvalMetrics:
         false_positive=false_positive,
         true_negative=true_negative,
         false_negative=false_negative,
+    )
+
+
+def evaluate_repair_cases(
+    cases: list[FixtureCase],
+    verify: bool = True,
+    records_dir: Path | None = None,
+) -> list[RepairFixtureResult]:
+    executor = RepairExecutor()
+    results: list[RepairFixtureResult] = []
+
+    for case in cases:
+        context_profile = load_context_profile(case.context_path)
+        record = executor.run(case.source_path, context_profile, verify=verify)
+        if records_dir is not None:
+            output_path = records_dir / f"{case.relative_path.replace('/', '__')}.json"
+            executor.write_record(record, output_path)
+        results.append(RepairFixtureResult(case=case, record=record))
+    return results
+
+
+def compute_repair_metrics(results: list[RepairFixtureResult]) -> RepairEvalMetrics:
+    vulnerable_total = sum(1 for result in results if result.case.has_vuln)
+    safe_total = sum(1 for result in results if not result.case.has_vuln)
+    repair_success_count = sum(1 for result in results if result.case.has_vuln and result.artifact_generated)
+    verification_pass_count = sum(1 for result in results if result.case.has_vuln and result.verification_passed)
+    false_fix_count = sum(1 for result in results if not result.case.has_vuln and result.artifact_generated)
+    rollback_count = sum(1 for result in results if result.case.has_vuln and result.rolled_back)
+    return RepairEvalMetrics(
+        vulnerable_total=vulnerable_total,
+        safe_total=safe_total,
+        repair_success_count=repair_success_count,
+        verification_pass_count=verification_pass_count,
+        false_fix_count=false_fix_count,
+        rollback_count=rollback_count,
     )
