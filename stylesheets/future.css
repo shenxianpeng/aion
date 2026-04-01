@@ -1,0 +1,367 @@
+:root {
+  --md-primary-fg-color: #0f426f;
+  --md-primary-fg-color--light: #356e9f;
+  --md-primary-fg-color--dark: #0b2f50;
+  --md-accent-fg-color: #f06a1d;
+  --aion-bg:
+    radial-gradient(circle at 0% 0%, rgba(240, 106, 29, 0.18), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(21, 111, 183, 0.18), transparent 32%),
+    linear-gradient(180deg, #f7f1e8 0%, #fbfaf7 48%, #f2efe8 100%);
+  --aion-surface: rgba(255, 255, 255, 0.7);
+  --aion-surface-strong: rgba(255, 255, 255, 0.84);
+  --aion-border: rgba(15, 66, 111, 0.12);
+  --aion-text: #11263c;
+  --aion-muted: #5c6f81;
+  --aion-glow: rgba(15, 66, 111, 0.12);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #7bc0ff;
+  --md-primary-fg-color--light: #a9d8ff;
+  --md-primary-fg-color--dark: #5b9cd7;
+  --md-accent-fg-color: #ff9a4a;
+  --aion-bg:
+    radial-gradient(circle at 0% 0%, rgba(255, 154, 74, 0.16), transparent 24%),
+    radial-gradient(circle at 100% 0%, rgba(80, 188, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, #08111d 0%, #0c1726 52%, #091019 100%);
+  --aion-surface: rgba(10, 20, 32, 0.68);
+  --aion-surface-strong: rgba(13, 24, 39, 0.86);
+  --aion-border: rgba(138, 196, 255, 0.16);
+  --aion-text: #eff6ff;
+  --aion-muted: #a9bbcd;
+  --aion-glow: rgba(123, 192, 255, 0.16);
+}
+
+body {
+  background: var(--aion-bg);
+  color: var(--aion-text);
+}
+
+.md-main {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / 12 - 1px),
+      rgba(17, 38, 60, 0.04) calc(100% / 12 - 1px),
+      rgba(17, 38, 60, 0.04) calc(100% / 12)
+    );
+}
+
+[data-md-color-scheme="slate"] .md-main {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / 12 - 1px),
+      rgba(255, 255, 255, 0.03) calc(100% / 12 - 1px),
+      rgba(255, 255, 255, 0.03) calc(100% / 12)
+    );
+}
+
+.md-header,
+.md-tabs {
+  background: color-mix(in srgb, var(--aion-surface-strong) 92%, transparent);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-bottom: 1px solid var(--aion-border);
+}
+
+.md-header {
+  box-shadow: 0 12px 30px -24px var(--aion-glow);
+}
+
+.md-tabs__link {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.md-header__title,
+.md-nav__title,
+.md-typeset {
+  color: var(--aion-text);
+}
+
+.md-header__button.md-logo {
+  color: var(--md-accent-fg-color);
+}
+
+.md-search__form,
+.md-header__option .md-select__button,
+.md-select__inner {
+  border-radius: 999px;
+}
+
+.md-search__form,
+.md-header__option .md-select__button {
+  background: color-mix(in srgb, var(--aion-surface-strong) 90%, transparent);
+  border: 1px solid var(--aion-border);
+}
+
+.md-select__inner {
+  background: var(--aion-surface-strong);
+  border: 1px solid var(--aion-border);
+  box-shadow: 0 30px 60px -32px var(--aion-glow);
+}
+
+.md-sidebar__scrollwrap,
+.md-content__inner,
+.md-search__output {
+  background: transparent;
+}
+
+.md-sidebar__inner,
+.md-content__inner {
+  border-radius: 1.5rem;
+}
+
+.md-nav--primary .md-nav__link,
+.md-nav--secondary .md-nav__link {
+  border-radius: 0.95rem;
+  padding-top: 0.42rem;
+  padding-bottom: 0.42rem;
+  transition: background-color 150ms ease, transform 150ms ease, color 150ms ease;
+}
+
+.md-nav--primary .md-nav__link:hover,
+.md-nav--secondary .md-nav__link:hover {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 9%, transparent);
+  transform: translateX(2px);
+}
+
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: var(--md-primary-fg-color);
+  font-weight: 700;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.md-typeset h1 {
+  margin-bottom: 1.1rem;
+}
+
+.md-typeset h2 {
+  margin-top: 2.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--aion-border);
+}
+
+.md-typeset a {
+  font-weight: 600;
+}
+
+.md-typeset table:not([class]) {
+  border-radius: 1.1rem;
+  overflow: hidden;
+  border: 1px solid var(--aion-border);
+  box-shadow: 0 24px 50px -38px var(--aion-glow);
+}
+
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+  background: color-mix(in srgb, var(--aion-surface) 88%, transparent);
+}
+
+.md-typeset code,
+.md-typeset pre > code {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.md-button {
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 0.85em 1.2em;
+}
+
+.md-button--primary {
+  box-shadow: 0 20px 34px -24px color-mix(in srgb, var(--md-primary-fg-color) 46%, transparent);
+}
+
+.aion-home {
+  display: grid;
+  gap: 1.4rem;
+  padding: 0.3rem 0 2rem;
+}
+
+.aion-home__hero,
+.aion-home__manifesto,
+.aion-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--aion-border);
+  border-radius: 1.6rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--aion-surface-strong) 96%, transparent) 0%, color-mix(in srgb, var(--aion-surface) 92%, transparent) 100%);
+  box-shadow: 0 40px 70px -48px var(--aion-glow);
+}
+
+.aion-home__hero {
+  padding: clamp(1.6rem, 3vw, 3rem);
+}
+
+.aion-home__hero::before,
+.aion-home__manifesto::before,
+.aion-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.14), transparent 42%),
+    radial-gradient(circle at 85% 15%, rgba(240, 106, 29, 0.12), transparent 24%);
+  pointer-events: none;
+}
+
+[data-md-color-scheme="slate"] .aion-home__hero::before,
+[data-md-color-scheme="slate"] .aion-home__manifesto::before,
+[data-md-color-scheme="slate"] .aion-panel::before {
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 42%),
+    radial-gradient(circle at 85% 15%, rgba(123, 192, 255, 0.12), transparent 24%);
+}
+
+.aion-home__eyebrow {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--aion-border);
+  color: var(--aion-muted);
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.aion-home__title,
+.aion-home__lede,
+.aion-home__actions,
+.aion-home__signal-grid,
+.aion-home__manifesto p,
+.aion-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aion-home__title {
+  margin: 1.1rem 0 0.8rem;
+  font-size: clamp(2.6rem, 6vw, 5.6rem);
+  line-height: 0.92;
+}
+
+.aion-home__title span {
+  display: block;
+  color: var(--md-accent-fg-color);
+}
+
+.aion-home__lede {
+  max-width: 48rem;
+  font-size: 1.08rem;
+  color: var(--aion-muted);
+}
+
+.aion-home__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.aion-home__signal-grid,
+.aion-card-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.aion-home__signal-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 1.5rem;
+}
+
+.aion-signal-card {
+  padding: 1rem;
+  border-radius: 1.2rem;
+  background: color-mix(in srgb, var(--aion-surface-strong) 72%, transparent);
+  border: 1px solid var(--aion-border);
+}
+
+.aion-signal-card__label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--aion-muted);
+  margin-bottom: 0.38rem;
+}
+
+.aion-signal-card__value {
+  font-weight: 700;
+}
+
+.aion-home__manifesto {
+  padding: 1.25rem 1.4rem;
+}
+
+.aion-home__manifesto p {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.aion-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.aion-panel {
+  padding: 1.35rem 1.4rem;
+}
+
+.aion-panel h2 {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+  font-size: 1.1rem;
+}
+
+.aion-panel ul,
+.aion-panel ol {
+  margin: 0;
+  color: var(--aion-muted);
+}
+
+.aion-panel li + li {
+  margin-top: 0.55rem;
+}
+
+@media screen and (max-width: 76.2344em) {
+  .aion-home__signal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aion-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 44em) {
+  .aion-home__hero,
+  .aion-home__manifesto,
+  .aion-panel {
+    border-radius: 1.2rem;
+  }
+
+  .aion-home__signal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aion-home__title {
+    font-size: clamp(2.2rem, 12vw, 3.6rem);
+  }
+}

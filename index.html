@@ -50,10 +50,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Space+Grotesk:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Space Grotesk";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="stylesheets/future.css">
     
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -79,11 +81,6 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#aion-overview" class="md-skip">
-          Skip to content
-        </a>
-      
     </div>
     <div data-md-component="announce">
       
@@ -94,12 +91,12 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="AION" class="md-header__button md-logo" aria-label="AION" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.6 6.62C21.58 6.62 24 9 24 12c0 2.96-2.42 5.37-5.4 5.37-1.45 0-2.8-.56-3.82-1.57L12 13.34l-2.83 2.51c-.97.97-2.33 1.53-3.77 1.53C2.42 17.38 0 14.96 0 12s2.42-5.38 5.4-5.38c1.44 0 2.8.56 3.82 1.58L12 10.66l2.83-2.51c.97-.97 2.33-1.53 3.77-1.53M7.8 14.39 10.5 12 7.84 9.65c-.68-.68-1.53-1.03-2.44-1.03C3.53 8.62 2 10.13 2 12s1.53 3.38 3.4 3.38c.91 0 1.76-.35 2.4-.99m8.4-4.78L13.5 12l2.66 2.35c.68.68 1.54 1.03 2.44 1.03 1.87 0 3.4-1.51 3.4-3.38s-1.53-3.38-3.4-3.38c-.91 0-1.76.35-2.4.99"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -237,13 +234,138 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="how-it-works/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  How It Works
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -251,19 +373,23 @@
           
             
               
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="." title="AION" class="md-nav__button md-logo" aria-label="AION" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.6 6.62C21.58 6.62 24 9 24 12c0 2.96-2.42 5.37-5.4 5.37-1.45 0-2.8-.56-3.82-1.57L12 13.34l-2.83 2.51c-.97.97-2.33 1.53-3.77 1.53C2.42 17.38 0 14.96 0 12s2.42-5.38 5.4-5.38c1.44 0 2.8.56 3.82 1.58L12 10.66l2.83-2.51c.97-.97 2.33-1.53 3.77-1.53M7.8 14.39 10.5 12 7.84 9.65c-.68-.68-1.53-1.03-2.44-1.03C3.53 8.62 2 10.13 2 12s1.53 3.38 3.4 3.38c.91 0 1.76-.35 2.4-.99m8.4-4.78L13.5 12l2.66 2.35c.68.68 1.54 1.03 2.44 1.03 1.87 0 3.4-1.51 3.4-3.38s-1.53-3.38-3.4-3.38c-.91 0-1.76.35-2.4.99"/></svg>
 
     </a>
     AION
@@ -296,26 +422,6 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
       
       <a href="." class="md-nav__link md-nav__link--active">
         
@@ -333,80 +439,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#current-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current release
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operating-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operating model
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-aion-is-for" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What AION is for
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-aion-does-not-do-yet" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What AION does not do yet
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue-reading" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue reading
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -555,7 +587,9 @@
             
             
               
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -564,71 +598,6 @@
   
   
   
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#current-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current release
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operating-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operating model
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-aion-is-for" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What AION is for
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-aion-does-not-do-yet" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What AION does not do yet
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue-reading" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue reading
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
   
 </nav>
                   </div>
@@ -642,81 +611,95 @@
               <article class="md-content__inner md-typeset">
                 
                   
+  
+
 
 
   
   
 
 
-<h1 id="aion-overview">AION Overview<a class="headerlink" href="#aion-overview" title="Permanent link">&para;</a></h1>
-<p>AION is an autonomous code-immunity system for Python services. It starts with
-context-aware security scanning and extends into deterministic remediation,
-sandbox verification, event orchestration, staged release control, and
-runtime-first containment planning.</p>
-<h2 id="current-release">Current release<a class="headerlink" href="#current-release" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Area</th>
-<th>What is implemented</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Detection</td>
-<td>Repository context extraction, Semgrep triage, fallback heuristics, optional LLM explanation</td>
-</tr>
-<tr>
-<td>Repair</td>
-<td>Deterministic patch artifacts for raw SQLite interpolation, hardcoded secrets, and missing auth decorators</td>
-</tr>
-<tr>
-<td>Verification</td>
-<td>Syntax checks, Semgrep re-scan, built-in assertions, staged project commands</td>
-</tr>
-<tr>
-<td>Control plane</td>
-<td>JSON event ingestion, persistent inbox, queue processing, webhook ingress</td>
-</tr>
-<tr>
-<td>Rollout</td>
-<td>Release candidate creation, approval, phased advancement, rejection, rollback</td>
-</tr>
-<tr>
-<td>Defense</td>
-<td>Runtime containment planning for gateway, WAF, feature flags, dependency actions, and code follow-up</td>
-</tr>
-</tbody>
-</table>
-<h2 id="operating-model">Operating model<a class="headerlink" href="#operating-model" title="Permanent link">&para;</a></h2>
-<ol>
-<li>Scan a repository or ingest an event.</li>
-<li>Convert findings into structured incidents.</li>
-<li>Generate a patch artifact instead of mutating the live repository.</li>
-<li>Stage the patch inside a sandbox and verify it.</li>
-<li>Persist the result as an inbox item, orchestration record, or release candidate.</li>
-<li>Produce rollout and runtime-defense recommendations.</li>
-</ol>
-<h2 id="what-aion-is-for">What AION is for<a class="headerlink" href="#what-aion-is-for" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Reviewing AI-generated or newly introduced Python changes against repository conventions</li>
-<li>Building a local control plane for autonomous repair experiments</li>
-<li>Testing policy-gated remediation before integrating real production adapters</li>
-<li>Capturing auditable repair, verification, and rollout state as JSON artifacts</li>
-</ul>
-<h2 id="what-aion-does-not-do-yet">What AION does not do yet<a class="headerlink" href="#what-aion-does-not-do-yet" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Hot-patch production code in place</li>
-<li>Push directly to deployment systems, WAF providers, or feature flag services</li>
-<li>Support non-Python languages in the current release</li>
-</ul>
-<h2 id="continue-reading">Continue reading<a class="headerlink" href="#continue-reading" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="installation/">Installation</a></li>
-<li><a href="usage/">Usage</a></li>
-<li><a href="configuration/">Configuration</a></li>
-<li><a href="how-it-works/">How It Works</a></li>
-</ul>
+<div class="aion-home">
+  <section class="aion-home__hero">
+    <div class="aion-home__eyebrow">autonomous software civilization</div>
+    <h1 class="aion-home__title">
+      Build code that refuses to decay.
+      <span>Operate software as a living system.</span>
+    </h1>
+    <p class="aion-home__lede">
+      AION is the control plane for code immortality. It detects structural drift,
+      synthesizes deterministic repairs, verifies them in isolation, and prepares
+      rollout plus runtime containment before a hotfix becomes human toil.
+    </p>
+    <div class="aion-home__actions">
+      <a class="md-button md-button--primary" href="usage/">Start the loop</a>
+      <a class="md-button" href="how-it-works/">See the architecture</a>
+    </div>
+    <div class="aion-home__signal-grid">
+      <div class="aion-signal-card">
+        <div class="aion-signal-card__label">Detect</div>
+        <div class="aion-signal-card__value">Semgrep + Context + LLM</div>
+      </div>
+      <div class="aion-signal-card">
+        <div class="aion-signal-card__label">Repair</div>
+        <div class="aion-signal-card__value">Deterministic Patch Artifacts</div>
+      </div>
+      <div class="aion-signal-card">
+        <div class="aion-signal-card__label">Verify</div>
+        <div class="aion-signal-card__value">Sandbox + Project Commands</div>
+      </div>
+      <div class="aion-signal-card">
+        <div class="aion-signal-card__label">Defend</div>
+        <div class="aion-signal-card__value">Release + Containment Decisions</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="aion-home__manifesto">
+    <p>
+      The goal is not faster maintenance. The goal is to end maintenance as a
+      default human activity.
+    </p>
+  </section>
+
+  <section class="aion-card-grid">
+    <article class="aion-panel">
+      <h2>What ships now</h2>
+      <ul>
+        <li>Context-aware Python scanning with repository profiling and Semgrep triage</li>
+        <li>Deterministic remediation for raw SQLite interpolation, secrets, and auth drift</li>
+        <li>Sandbox verification with assertions, Semgrep re-scan, and project commands</li>
+        <li>Inbox, queue, webhook, release, rollback, and defense planning control-plane flows</li>
+      </ul>
+    </article>
+    <article class="aion-panel">
+      <h2>Operating model</h2>
+      <ol>
+        <li>Ingest a repository scan or runtime event.</li>
+        <li>Upgrade findings into incidents and remediation plans.</li>
+        <li>Emit a patch artifact instead of mutating the live repository.</li>
+        <li>Verify the artifact inside a file or repository sandbox.</li>
+        <li>Persist the result as orchestration state and rollout intent.</li>
+      </ol>
+    </article>
+    <article class="aion-panel">
+      <h2>What AION is for</h2>
+      <ul>
+        <li>Evaluating AI-generated code against repository-specific conventions</li>
+        <li>Prototyping autonomous repair loops with policy gates</li>
+        <li>Building auditable remediation records for future production adapters</li>
+      </ul>
+    </article>
+    <article class="aion-panel">
+      <h2>Current boundary</h2>
+      <ul>
+        <li>No in-place production hot patching</li>
+        <li>No direct push into external deploy, WAF, or feature-flag systems</li>
+        <li>Python-only in the current release</li>
+      </ul>
+    </article>
+  </section>
+</div>
 
 
 
@@ -724,8 +707,13 @@ runtime-first containment planning.</p>
 
 
 
+  
+  
 
 
+
+
+  
 
 
 
@@ -748,6 +736,8 @@ runtime-first containment planning.</p>
         <footer class="md-footer">
   
     
+      
+        
       
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
@@ -822,7 +812,7 @@ runtime-first containment planning.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.top", "navigation.sections", "navigation.footer", "content.code.copy", "search.highlight", "search.suggest", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.sections", "navigation.footer", "content.code.copy", "search.highlight", "search.suggest", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
