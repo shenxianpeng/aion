@@ -19,6 +19,8 @@ from .llm_analyzer import LLMAnalyzer, LLMAnalyzerError
 from .models import (
     ContextProfile,
     Finding,
+    OrchestrationResult,
+    OrchestrationEvent,
     PatchArtifact,
     ProjectScanSummary,
     RepairAttemptRecord,
@@ -218,6 +220,26 @@ def repair_eval(
     _exit_with_repair_eval(results, metrics, output)
 
 
+@app.command("process-event")
+def process_event(
+    event_file: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
+    context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
+    result_path: Path | None = typer.Option(None, "--result-path", resolve_path=True),
+    output: str = typer.Option("text", "--output", help="text or json"),
+    cleanup_sandbox: bool = typer.Option(False, "--cleanup-sandbox/--keep-sandbox", help="Remove sandbox workspace after processing."),
+) -> None:
+    payload = json.loads(event_file.read_text(encoding="utf-8"))
+    orchestrator = Orchestrator()
+    event = orchestrator.ingest_event(payload)
+    context_profile = _load_context_profile_for_event(event, context_file)
+    result = orchestrator.process_event(event, context_profile)
+    if result_path is not None:
+        result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    if cleanup_sandbox:
+        orchestrator.cleanup_sandbox(result)
+    _exit_with_orchestration_result(result, output)
+
+
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
     extra_ignore_patterns = extra_ignore_patterns or []
     if target.is_file():
@@ -385,6 +407,15 @@ def _load_context_profile(target: Path, context_file: Path | None) -> ContextPro
     return ContextExtractor(root=root).extract()
 
 
+def _load_context_profile_for_event(event: OrchestrationEvent, context_file: Path | None) -> ContextProfile:
+    if context_file is not None:
+        return _load_context_profile(Path(event.target_file), context_file)
+    maybe_context = event.metadata.get("context_file")
+    if maybe_context:
+        return _load_context_profile(Path(event.target_file), Path(str(maybe_context)))
+    return _load_context_profile(Path(event.target_file), None)
+
+
 def _build_repair_session(target: Path, context_profile: ContextProfile) -> RepairSession:
     detector = IncidentDetector()
     generator = PatchGenerator()
@@ -480,6 +511,56 @@ def _exit_with_run_incident(result: RunIncidentResult, output: str) -> None:
                 title="Verification",
             )
         )
+    raise typer.Exit(code=0)
+
+
+def _exit_with_orchestration_result(result: OrchestrationResult, output: str) -> None:
+    if output == "json":
+        stdout_console.print_json(result.model_dump_json())
+        raise typer.Exit(code=0)
+
+    stdout_console.print(
+        Panel(
+            (
+                f"Event: {result.event.event_id}\n"
+                f"Type: {result.event.event_type}\n"
+                f"Target: {result.event.target_file}\n"
+                f"Policy: {result.policy.action}"
+            ),
+            title="AION Process Event",
+        )
+    )
+    reasons = Table(title="Policy Reasons")
+    reasons.add_column("Reason")
+    for reason in result.policy.reasons or ["No policy reasons recorded."]:
+        reasons.add_row(reason)
+    stdout_console.print(reasons)
+
+    if result.incidents:
+        incidents = Table(title="Incidents")
+        incidents.add_column("Type")
+        incidents.add_column("Severity")
+        incidents.add_column("Confidence")
+        for incident in result.incidents:
+            incidents.add_row(incident.issue_type, incident.severity, f"{incident.confidence:.2f}")
+        stdout_console.print(incidents)
+
+    if result.sandbox is not None:
+        verdict = result.sandbox.verification.verdict if result.sandbox.verification is not None else "-"
+        stdout_console.print(
+            Panel(
+                (
+                    f"Workspace: {result.sandbox.workspace_root}\n"
+                    f"Staged file: {result.sandbox.staged_target_file}\n"
+                    f"Patch applied: {result.sandbox.patch_applied}\n"
+                    f"Verdict: {verdict}"
+                ),
+                title="Sandbox",
+            )
+        )
+
+    for warning in result.warnings:
+        stderr_console.print(f"[yellow]warning:[/yellow] {warning}")
     raise typer.Exit(code=0)
 
 

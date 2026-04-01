@@ -40,6 +40,7 @@ uv run aion repair ./path/to/file.py --context-file ./context.json --artifact-pa
 uv run aion verify --artifact-path ./artifact.json
 uv run aion run-incident ./path/to/file.py --context-file ./context.json --output json
 uv run aion repair-eval ./tests/fixtures --records-dir ./repair-records --output json
+uv run aion process-event ./event.json --result-path ./orchestration.json --output json
 ```
 
 ## Config File
@@ -65,6 +66,7 @@ CLI flags still override config values.
 - The first autonomy release does not modify production code or apply patches in place; it emits patch artifacts and verifies them locally.
 - Deterministic auto-repair currently covers raw sqlite f-string queries, hardcoded secrets, and missing auth decorators.
 - `repair` and `run-incident` can persist full repair attempt records for auditability, and `repair-eval` reports repair success, verification pass, false-fix, and rollback rates.
+- `process-event` is the current control-plane prototype: it ingests an event payload, applies policy gating, and runs approved remediations in a sandbox workspace.
 
 ## Tests
 

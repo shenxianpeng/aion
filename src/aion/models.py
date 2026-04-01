@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 Severity = Literal["critical", "high", "medium", "low"]
 IncidentStatus = Literal["detected", "planned", "patched", "verified", "approved", "rejected"]
 VerificationVerdict = Literal["verified_fix", "unsafe_patch", "needs_human_review"]
+EventType = Literal["code_scan", "runtime_alert", "dependency_alert"]
+PolicyAction = Literal["auto_repair_sandbox", "needs_human_review", "blocked"]
 
 
 class ContextProfile(BaseModel):
@@ -125,6 +127,27 @@ class RepairAttemptRecord(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class OrchestrationEvent(BaseModel):
+    event_id: str
+    event_type: EventType = "code_scan"
+    target_file: str
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class PolicyDecision(BaseModel):
+    action: PolicyAction
+    reasons: list[str] = Field(default_factory=list)
+    approved_incident_ids: list[str] = Field(default_factory=list)
+    sandbox_required: bool = True
+
+
+class SandboxExecutionResult(BaseModel):
+    workspace_root: str
+    staged_target_file: str
+    patch_applied: bool = False
+    verification: VerificationResult | None = None
+
+
 class ScanReport(BaseModel):
     file: str
     findings: list[Finding] = Field(default_factory=list)
@@ -178,6 +201,15 @@ class RepairSession(BaseModel):
 class RunIncidentResult(BaseModel):
     session: RepairSession
     verification: VerificationResult | None = None
+
+
+class OrchestrationResult(BaseModel):
+    event: OrchestrationEvent
+    policy: PolicyDecision
+    incidents: list[Incident] = Field(default_factory=list)
+    artifact: PatchArtifact | None = None
+    sandbox: SandboxExecutionResult | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 def normalize_path(path: Path) -> str:

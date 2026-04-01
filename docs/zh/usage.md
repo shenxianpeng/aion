@@ -49,10 +49,15 @@ uv run aion run-incident ./path/to/file.py \
 uv run aion repair-eval ./tests/fixtures \
   --records-dir ./repair-records \
   --output json
+
+uv run aion process-event ./event.json \
+  --result-path ./orchestration.json \
+  --output json
 ```
 
 当前首版自治能力只生成补丁 artifact 并在本地验证，不会直接原地改写生产文件。
 `repair-eval` 会批量运行确定性修复流水线，并输出修复成功率、验证通过率、误修率和回滚率。
+`process-event` 是当前控制平面原型入口：它接收事件 payload，做策略门控，并只在 sandbox 工作区里执行获批修复。
 
 `--verbose` 会把上下文提取结果、Semgrep 结果、fallback 原因和 token 估算输出到 stderr。
 

@@ -5,8 +5,8 @@ import pytest
 from typer.testing import CliRunner
 
 from aion.cli import app
-from aion.models import ContextProfile
-from aion.orchestrator import Orchestrator
+from aion.models import ContextProfile, Incident
+from aion.orchestrator import Orchestrator, PolicyEngine
 from aion.repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 
 
@@ -74,6 +74,45 @@ def test_orchestrator_runs_incident_end_to_end(monkeypatch: pytest.MonkeyPatch) 
     assert result.verification.verdict == "verified_fix"
 
 
+def test_policy_engine_requires_human_review_for_unknown_issue() -> None:
+    event = Orchestrator().ingest_event({"event_type": "code_scan", "target_file": "demo.py"})
+    decision = PolicyEngine().decide(
+        event,
+        [
+            Incident(
+                id="abc123",
+                target_file="demo.py",
+                issue_type="unknown_rule",
+                issue="Unknown issue",
+                severity="high",
+                line=1,
+                confidence=0.99,
+            )
+        ],
+    )
+
+    assert decision.action == "needs_human_review"
+    assert "not approved for automatic remediation" in decision.reasons[0]
+
+
+def test_orchestrator_process_event_runs_in_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    orchestrator = Orchestrator()
+    target = Path("tests/fixtures/vulnerable/02_hardcoded_secret.py").resolve()
+    context = _load_context("tests/fixtures/vulnerable/02_context.json")
+    event = orchestrator.ingest_event({"event_type": "runtime_alert", "target_file": str(target)})
+
+    result = orchestrator.process_event(event, context)
+
+    assert result.policy.action == "auto_repair_sandbox"
+    assert result.sandbox is not None
+    assert Path(result.sandbox.staged_target_file).exists()
+    assert result.sandbox.verification is not None
+    assert result.sandbox.verification.verdict == "verified_fix"
+    orchestrator.cleanup_sandbox(result)
+    assert not Path(result.sandbox.workspace_root).exists()
+
+
 def test_repair_executor_records_attempt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
     target = Path("tests/fixtures/vulnerable/01_raw_sqlite3.py")
@@ -139,3 +178,33 @@ def test_cli_repair_eval_outputs_metrics_and_records(monkeypatch: pytest.MonkeyP
     assert payload["metrics"]["verification_pass_count"] == 3
     assert payload["metrics"]["false_fix_count"] == 0
     assert len(list(records_dir.glob("*.json"))) == 6
+
+
+def test_cli_process_event_outputs_json_and_persists_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    runner = CliRunner()
+    event_path = tmp_path / "event.json"
+    result_path = tmp_path / "orchestration.json"
+    event_path.write_text(
+        json.dumps(
+            {
+                "event_type": "runtime_alert",
+                "target_file": str(Path("tests/fixtures/vulnerable/03_missing_auth_decorator.py").resolve()),
+                "metadata": {
+                    "context_file": str(Path("tests/fixtures/vulnerable/03_context.json").resolve()),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["process-event", str(event_path), "--result-path", str(result_path), "--output", "json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["policy"]["action"] == "auto_repair_sandbox"
+    assert payload["sandbox"]["verification"]["verdict"] == "verified_fix"
+    assert json.loads(result_path.read_text(encoding="utf-8"))["policy"]["action"] == "auto_repair_sandbox"

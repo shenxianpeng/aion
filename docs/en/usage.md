@@ -49,10 +49,15 @@ uv run aion run-incident ./path/to/file.py \
 uv run aion repair-eval ./tests/fixtures \
   --records-dir ./repair-records \
   --output json
+
+uv run aion process-event ./event.json \
+  --result-path ./orchestration.json \
+  --output json
 ```
 
 The current autonomy release generates patch artifacts and verifies them locally. It does not rewrite production files in place.
 `repair-eval` runs the deterministic repair pipeline across fixture cases and reports repair success rate, verification pass rate, false-fix rate, and rollback rate.
+`process-event` is the staged orchestration entrypoint. It accepts an event payload, applies policy gating, and only runs approved remediations inside a sandbox workspace.
 
 Verbose mode prints the extracted context profile, Semgrep findings, fallback reasons,
 and token estimates to stderr.
