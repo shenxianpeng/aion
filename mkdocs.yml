@@ -8,9 +8,12 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   language: en
+  icon:
+    logo: material/infinity
+    repo: fontawesome/brands/github
   font:
-    text: false
-    code: false
+    text: Space Grotesk
+    code: JetBrains Mono
   palette:
     - scheme: default
       primary: custom
@@ -25,6 +28,8 @@ theme:
         icon: material/brightness-7
         name: Switch to light mode
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.top
     - navigation.sections
     - navigation.footer
@@ -32,8 +37,9 @@ theme:
     - search.highlight
     - search.suggest
     - toc.follow
-  icon:
-    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/future.css
 
 nav:
   - Overview: index.md
