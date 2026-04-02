@@ -12,6 +12,9 @@ def test_scan_requires_anthropic_api_key(monkeypatch, tmp_path: Path) -> None:
     target = tmp_path / "sample.py"
     target.write_text("print('hi')\n", encoding="utf-8")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
 
     result = runner.invoke(app, ["scan", str(target)])
 
@@ -195,3 +198,63 @@ def test_scan_honors_explicit_ai_generated_targets(monkeypatch, tmp_path: Path) 
 
     assert result.exit_code == 0
     assert scanned_files == ["selected.py"]
+
+
+def test_scan_auto_detects_openai_provider_from_env(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "sample.py"
+    target.write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    detected_provider: list[str] = []
+
+    monkeypatch.setattr(
+        cli_module.ContextExtractor,
+        "extract",
+        lambda self: cli_module.ContextProfile(orm=None, scanned_files=1),
+    )
+    monkeypatch.setattr(cli_module, "semgrep_available", lambda: False)
+    monkeypatch.setattr(cli_module, "_git_history_has_ai_marker", lambda path, root: False)
+
+    class FakeAnalyzer:
+        def __init__(self, *args, **kwargs):
+            detected_provider.append(kwargs.get("provider", ""))
+
+        def analyze(self, target, context_profile, semgrep_findings, fallback_signals=None, console=None):
+            return []
+
+        def estimate_tokens(self, target, context_profile):
+            return 1
+
+    monkeypatch.setattr(cli_module, "LLMAnalyzer", FakeAnalyzer)
+
+    result = runner.invoke(app, ["scan", str(target)])
+
+    assert result.exit_code == 0
+    assert detected_provider == ["openai"]
+
+
+def test_scan_requires_gemini_api_key(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "sample.py"
+    target.write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    result = runner.invoke(app, ["scan", str(target), "--provider", "gemini"])
+
+    assert result.exit_code == 2
+    assert "GEMINI_API_KEY is not set" in result.output
+
+
+def test_scan_requires_azure_api_key(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "sample.py"
+    target.write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+
+    result = runner.invoke(app, ["scan", str(target), "--provider", "azure"])
+
+    assert result.exit_code == 2
+    assert "AZURE_OPENAI_API_KEY is not set" in result.output

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Literal
 
 from .models import ContextProfile, Finding, LLMScanResponse, SemgrepFinding
 
-LLMProvider = Literal["anthropic", "openai"]
+LLMProvider = Literal["anthropic", "openai", "gemini", "azure"]
 
 
 class LLMAnalyzerError(RuntimeError):
@@ -97,6 +98,39 @@ class LLMAnalyzer:
                 raise LLMAnalyzerError("openai is not installed") from exc
             return instructor.from_openai(OpenAI(api_key=self.api_key))
 
+        if self.provider == "gemini":
+            try:
+                import google.generativeai as genai
+            except ImportError as exc:
+                raise LLMAnalyzerError(
+                    "google-generativeai is not installed; run: pip install google-generativeai"
+                ) from exc
+            genai.configure(api_key=self.api_key)
+            return instructor.from_gemini(
+                client=genai.GenerativeModel(model_name=self.model),
+                mode=instructor.Mode.GEMINI_JSON,
+            )
+
+        if self.provider == "azure":
+            try:
+                from openai import AzureOpenAI
+            except ImportError as exc:
+                raise LLMAnalyzerError("openai is not installed") from exc
+            endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+            if not endpoint:
+                raise LLMAnalyzerError(
+                    "AZURE_OPENAI_ENDPOINT is not set. "
+                    "Export it before running, for example: "
+                    "export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com"
+                )
+            return instructor.from_openai(
+                AzureOpenAI(
+                    api_key=self.api_key,
+                    api_version="2024-02-01",
+                    azure_endpoint=endpoint,
+                )
+            )
+
         raise LLMAnalyzerError(f"unsupported provider: {self.provider}")
 
     def _create_completion(self, client, prompt: str) -> LLMScanResponse:
@@ -114,7 +148,7 @@ class LLMAnalyzer:
                 ],
             )
 
-        if self.provider == "openai":
+        if self.provider in ("openai", "azure"):
             return client.chat.completions.create(
                 model=self.model,
                 max_completion_tokens=1800,
@@ -125,6 +159,17 @@ class LLMAnalyzer:
                         "content": prompt,
                     }
                 ],
+            )
+
+        if self.provider == "gemini":
+            return client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                response_model=LLMScanResponse,
             )
 
         raise LLMAnalyzerError(f"unsupported provider: {self.provider}")

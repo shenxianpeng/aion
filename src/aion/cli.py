@@ -57,6 +57,8 @@ AI_MARKERS = (
 class Provider(str, Enum):
     anthropic = "anthropic"
     openai = "openai"
+    gemini = "gemini"
+    azure = "azure"
 
 
 @app.callback()
@@ -72,7 +74,7 @@ def scan(
         "--ai-generated",
         help="Explicit files or directories to treat as AI-generated. Can be repeated.",
     ),
-    provider: Provider | None = typer.Option(None, "--provider", help="LLM provider: anthropic or openai."),
+    provider: Provider | None = typer.Option(None, "--provider", help="LLM provider: anthropic, openai, gemini, or azure."),
     model: str | None = typer.Option(None, help="Model name. Defaults depend on provider."),
     output: str = typer.Option("text", "--output", help="text or json"),
     verbose: bool = typer.Option(False, "--verbose", help="Print context and raw prompts to stderr."),
@@ -83,7 +85,7 @@ def scan(
     except ConfigError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    resolved_provider = provider or _provider_from_config(config) or Provider.anthropic
+    resolved_provider = provider or _provider_from_config(config) or _auto_detect_provider()
 
     api_key = _resolve_api_key(resolved_provider)
     if not api_key:
@@ -468,6 +470,10 @@ def _resolve_api_key(provider: Provider) -> str | None:
         return os.getenv("ANTHROPIC_API_KEY")
     if provider == Provider.openai:
         return os.getenv("OPENAI_API_KEY")
+    if provider == Provider.gemini:
+        return os.getenv("GEMINI_API_KEY")
+    if provider == Provider.azure:
+        return os.getenv("AZURE_OPENAI_API_KEY")
     return None
 
 
@@ -476,6 +482,14 @@ def _missing_api_key_message(provider: Provider) -> str:
         return "ANTHROPIC_API_KEY is not set. Export it before running, for example: export ANTHROPIC_API_KEY=your_key"
     if provider == Provider.openai:
         return "OPENAI_API_KEY is not set. Export it before running, for example: export OPENAI_API_KEY=your_key"
+    if provider == Provider.gemini:
+        return "GEMINI_API_KEY is not set. Export it before running, for example: export GEMINI_API_KEY=your_key"
+    if provider == Provider.azure:
+        return (
+            "AZURE_OPENAI_API_KEY is not set. Export it before running, for example: "
+            "export AZURE_OPENAI_API_KEY=your_key\n"
+            "Also set the endpoint: export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com"
+        )
     return "Provider API key is not set."
 
 
@@ -484,7 +498,24 @@ def _default_model_for_provider(provider: Provider) -> str:
         return "claude-3-5-sonnet-latest"
     if provider == Provider.openai:
         return "gpt-4.1"
+    if provider == Provider.gemini:
+        return "gemini-2.0-flash"
+    if provider == Provider.azure:
+        return "gpt-4"
     raise ValueError(f"unsupported provider: {provider}")
+
+
+def _auto_detect_provider() -> Provider:
+    """Return the first provider whose API key is available in the environment."""
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return Provider.anthropic
+    if os.getenv("OPENAI_API_KEY"):
+        return Provider.openai
+    if os.getenv("GEMINI_API_KEY"):
+        return Provider.gemini
+    if os.getenv("AZURE_OPENAI_API_KEY"):
+        return Provider.azure
+    return Provider.anthropic
 
 
 def _provider_from_config(config: AppConfig) -> Provider | None:

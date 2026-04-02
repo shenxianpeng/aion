@@ -18,6 +18,10 @@ dependencies = [
     "typer>=0.23.1",
 ]
 
+[project.optional-dependencies]
+gemini = ["google-generativeai>=0.8.0"]
+all = ["google-generativeai>=0.8.0"]
+
 [project.scripts]
 aion = "aion.cli:app"
 
