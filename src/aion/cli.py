@@ -130,56 +130,62 @@ def scan(
     for idx, file_path in enumerate(files_to_scan, start=1):
         stderr_console.print(f"  [[cyan]{idx}/{total}[/cyan]] {file_path.name} ...", end=" ")
         report = ScanReport(file=normalize_path(file_path), ai_generated=True)
-        semgrep_findings = []
-        if has_semgrep:
-            try:
-                semgrep_findings = runner.run(file_path)
-            except SemgrepError as exc:
-                summary.warnings.append(f"semgrep failed for {file_path.name}: {exc}")
-        report.semgrep_findings = semgrep_findings
-
-        if verbose:
-            stderr_console.print()
-            stderr_console.print(f"[bold]Estimated token cost[/bold] {file_path}: {analyzer.estimate_tokens(file_path, context_profile)}")
-            if semgrep_findings:
-                stderr_console.print("[bold]Semgrep findings[/bold]")
-                stderr_console.print_json(
-                    json.dumps([finding.model_dump() for finding in semgrep_findings], ensure_ascii=False)
-                )
-
         try:
-            reasons = fallback_reasons(file_path, context_profile)
-            if verbose and reasons:
-                stderr_console.print(f"[bold]Fallback reasons[/bold] {file_path}: {', '.join(reasons)}")
+            semgrep_findings = []
+            if has_semgrep:
+                try:
+                    semgrep_findings = runner.run(file_path)
+                except SemgrepError as exc:
+                    summary.warnings.append(f"semgrep failed for {file_path.name}: {exc}")
+            report.semgrep_findings = semgrep_findings
 
-            should_run_llm = (not has_semgrep) or bool(semgrep_findings) or bool(reasons)
-            if not should_run_llm:
-                report.mode = "semgrep-only"
-                report.findings = []
-            else:
-                report.findings = analyzer.analyze(
-                    file_path,
-                    context_profile,
-                    semgrep_findings,
-                    fallback_signals=reasons,
-                    console=stderr_console,
-                )
-                report.mode = "llm-only" if not has_semgrep else "semgrep+llm"
-        except LLMAnalyzerError as exc:
-            summary.warnings.append(f"LLM analysis failed for {file_path.name}: {exc}")
-            report.mode = "semgrep-only" if has_semgrep else "skipped"
-        report.incidents = detector.detect(file_path, context_profile)
+            if verbose:
+                stderr_console.print()
+                stderr_console.print(f"[bold]Estimated token cost[/bold] {file_path}: {analyzer.estimate_tokens(file_path, context_profile)}")
+                if semgrep_findings:
+                    stderr_console.print("[bold]Semgrep findings[/bold]")
+                    stderr_console.print_json(
+                        json.dumps([finding.model_dump() for finding in semgrep_findings], ensure_ascii=False)
+                    )
 
-        finding_count = len(report.findings) + len(report.semgrep_findings)
-        incident_count = len(report.incidents)
-        if not verbose:
+            try:
+                reasons = fallback_reasons(file_path, context_profile)
+                if verbose and reasons:
+                    stderr_console.print(f"[bold]Fallback reasons[/bold] {file_path}: {', '.join(reasons)}")
+
+                should_run_llm = (not has_semgrep) or bool(semgrep_findings) or bool(reasons)
+                if not should_run_llm:
+                    report.mode = "semgrep-only"
+                    report.findings = []
+                else:
+                    report.findings = analyzer.analyze(
+                        file_path,
+                        context_profile,
+                        semgrep_findings,
+                        fallback_signals=reasons,
+                        console=stderr_console,
+                    )
+                    report.mode = "llm-only" if not has_semgrep else "semgrep+llm"
+            except LLMAnalyzerError as exc:
+                summary.warnings.append(f"LLM analysis failed for {file_path.name}: {exc}")
+                report.mode = "semgrep-only" if has_semgrep else "skipped"
+            report.incidents = detector.detect(file_path, context_profile)
+
+            finding_count = len(report.findings) + len(report.semgrep_findings)
+            incident_count = len(report.incidents)
             parts = []
             if finding_count:
                 parts.append(f"[yellow]{finding_count} finding{'s' if finding_count != 1 else ''}[/yellow]")
             if incident_count:
                 parts.append(f"[red]{incident_count} incident{'s' if incident_count != 1 else ''}[/red]")
             status = ", ".join(parts) if parts else "[green]clean[/green]"
-            stderr_console.print(status)
+            if verbose:
+                stderr_console.print(f"  -> {status}")
+            else:
+                stderr_console.print(status)
+        except Exception:
+            stderr_console.print()  # ensure the progress line ends with a newline before re-raising
+            raise
 
         summary.reports.append(report)
 
