@@ -84,6 +84,44 @@ class IncidentDetector:
                 )
             )
 
+        if self._has_insecure_yaml_load(content):
+            incidents.append(
+                Incident(
+                    id=self._incident_id(target, "insecure_yaml_load"),
+                    source="heuristic",
+                    target_file=normalize_path(target),
+                    issue_type="insecure_yaml_load",
+                    issue="yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
+                    severity="critical",
+                    line=self._line_for(content, "yaml.load("),
+                    evidence=["yaml.load called without SafeLoader"],
+                    confidence=0.97,
+                    attack_surface="deserialization",
+                    recommended_action="auto_repair",
+                    remediation_strategy="safe_yaml_load",
+                    verification_strategy=["syntax", "yaml_safe_load", "semgrep"],
+                )
+            )
+
+        if self._has_command_injection(content):
+            incidents.append(
+                Incident(
+                    id=self._incident_id(target, "command_injection"),
+                    source="heuristic",
+                    target_file=normalize_path(target),
+                    issue_type="command_injection",
+                    issue="os.system with an f-string argument is vulnerable to shell command injection.",
+                    severity="critical",
+                    line=self._line_for(content, "os.system("),
+                    evidence=["os.system(f-string)"],
+                    confidence=0.95,
+                    attack_surface="command_execution",
+                    recommended_action="auto_repair",
+                    remediation_strategy="shlex_quote_command",
+                    verification_strategy=["syntax", "command_shlex_quoted"],
+                )
+            )
+
         return incidents
 
     def _has_raw_sqlite_issue(self, content: str) -> bool:
@@ -98,6 +136,15 @@ class IncidentDetector:
             if "os.getenv" not in match.group(0):
                 return match
         return None
+
+    def _has_insecure_yaml_load(self, content: str) -> bool:
+        for match in re.finditer(r"\byaml\.load\s*\([^)]*\)", content):
+            if "Loader" not in match.group(0):
+                return True
+        return False
+
+    def _has_command_injection(self, content: str) -> bool:
+        return bool(re.search(r"os\.system\s*\(\s*f[\"']", content))
 
     def _has_missing_auth_issue(self, content: str, context_profile: ContextProfile) -> bool:
         if "APIRouter" not in content or "@router." not in content:
@@ -160,6 +207,29 @@ class PatchPlanner:
                     f"Add {chosen} above the route decorator.",
                 ],
                 verification_steps=["syntax", "auth_decorator_present"],
+            )
+        if incident.issue_type == "insecure_yaml_load":
+            return RemediationPlan(
+                incident_id=incident.id,
+                target_file=incident.target_file,
+                strategy="safe_yaml_load",
+                summary="Replace yaml.load with yaml.safe_load to prevent arbitrary code execution.",
+                planned_changes=[
+                    "Replace yaml.load( with yaml.safe_load( to use the safe YAML deserializer.",
+                ],
+                verification_steps=["syntax", "yaml_safe_load"],
+            )
+        if incident.issue_type == "command_injection":
+            return RemediationPlan(
+                incident_id=incident.id,
+                target_file=incident.target_file,
+                strategy="shlex_quote_command",
+                summary="Wrap os.system f-string variables with shlex.quote to prevent shell injection.",
+                planned_changes=[
+                    "Wrap user-controlled variables in shlex.quote() inside os.system f-string.",
+                    "Import shlex when needed.",
+                ],
+                verification_steps=["syntax", "command_shlex_quoted"],
             )
         return None
 
@@ -236,6 +306,10 @@ class PatchGenerator:
             return self._replace_hardcoded_secret(content)
         if plan.strategy == "inject_auth_decorator":
             return self._inject_auth_decorator(content, context_profile)
+        if plan.strategy == "safe_yaml_load":
+            return self._fix_yaml_load(content)
+        if plan.strategy == "shlex_quote_command":
+            return self._fix_command_injection(content)
         return content
 
     def _parameterize_sqlite_query(self, content: str) -> str:
@@ -282,6 +356,41 @@ class PatchGenerator:
                 lines.insert(index, decorator)
                 return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
         return content
+
+    def _fix_yaml_load(self, content: str) -> str:
+        def repl(match: re.Match[str]) -> str:
+            call = match.group(0)
+            if "Loader" in call:
+                return call
+            return call.replace("yaml.load(", "yaml.safe_load(", 1)
+
+        return re.sub(r"\byaml\.load\s*\([^)]*\)", repl, content)
+
+    def _fix_command_injection(self, content: str) -> str:
+        pattern = re.compile(
+            r"os\.system\s*\(\s*f(?P<quote>[\"'])(?P<cmd>[^{]*)\{(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)\}(?P<tail>[^\"']*?)(?P=quote)\s*\)",
+        )
+
+        def repl(match: re.Match[str]) -> str:
+            var = match.group("var")
+            cmd = match.group("cmd")
+            tail = match.group("tail")
+            quote = match.group("quote")
+            return f'os.system(f{quote}{cmd}{{shlex.quote({var})}}{tail}{quote})'
+
+        updated = pattern.sub(repl, content, count=1)
+        if updated != content and "import shlex" not in updated:
+            lines = updated.splitlines()
+            insert_at = 0
+            for i, line in enumerate(lines):
+                if line.startswith("import os"):
+                    insert_at = i + 1
+                    break
+            lines.insert(insert_at, "import shlex")
+            updated = "\n".join(lines)
+            if content.endswith("\n"):
+                updated += "\n"
+        return updated
 
     def _is_valid_python(self, content: str) -> bool:
         try:
@@ -401,6 +510,32 @@ class Verifier:
                 )
                 if not passed:
                     reasons.append("Auth decorator was not injected into the route declaration.")
+            elif plan.strategy == "safe_yaml_load":
+                remaining_unsafe = any(
+                    "Loader" not in m.group(0)
+                    for m in re.finditer(r"\byaml\.load\s*\([^)]*\)", patched)
+                )
+                passed = "yaml.safe_load(" in patched and not remaining_unsafe
+                checks.append(
+                    VerificationCheck(
+                        name="yaml_safe_load",
+                        passed=passed,
+                        details="yaml.load replaced with yaml.safe_load to prevent arbitrary code execution.",
+                    )
+                )
+                if not passed:
+                    reasons.append("Insecure yaml.load still present after patching.")
+            elif plan.strategy == "shlex_quote_command":
+                passed = "shlex.quote(" in patched
+                checks.append(
+                    VerificationCheck(
+                        name="command_shlex_quoted",
+                        passed=passed,
+                        details="os.system argument is wrapped with shlex.quote to prevent shell injection.",
+                    )
+                )
+                if not passed:
+                    reasons.append("os.system call is not protected with shlex.quote.")
 
         return not reasons, {"checks": checks, "reasons": reasons}
 

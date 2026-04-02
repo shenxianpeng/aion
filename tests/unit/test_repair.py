@@ -21,6 +21,8 @@ def _load_context(path: str) -> ContextProfile:
         ("tests/fixtures/vulnerable/01_raw_sqlite3.py", "tests/fixtures/vulnerable/01_context.json", "parameterize_sqlite_query"),
         ("tests/fixtures/vulnerable/02_hardcoded_secret.py", "tests/fixtures/vulnerable/02_context.json", "env_secret"),
         ("tests/fixtures/vulnerable/03_missing_auth_decorator.py", "tests/fixtures/vulnerable/03_context.json", "inject_auth_decorator"),
+        ("tests/fixtures/vulnerable/04_insecure_yaml_load.py", "tests/fixtures/vulnerable/04_context.json", "safe_yaml_load"),
+        ("tests/fixtures/vulnerable/05_command_injection.py", "tests/fixtures/vulnerable/05_context.json", "shlex_quote_command"),
     ],
 )
 def test_repair_pipeline_generates_verified_fix(
@@ -246,10 +248,10 @@ def test_cli_repair_eval_outputs_metrics_and_records(monkeypatch: pytest.MonkeyP
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["metrics"]["repair_success_count"] == 3
-    assert payload["metrics"]["verification_pass_count"] == 3
+    assert payload["metrics"]["repair_success_count"] == 5
+    assert payload["metrics"]["verification_pass_count"] == 5
     assert payload["metrics"]["false_fix_count"] == 0
-    assert len(list(records_dir.glob("*.json"))) == 6
+    assert len(list(records_dir.glob("*.json"))) == 10
 
 
 def test_cli_process_event_outputs_json_and_persists_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

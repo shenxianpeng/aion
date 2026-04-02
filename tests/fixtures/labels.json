@@ -11,6 +11,14 @@
     "has_vuln": true,
     "expected_context_gap": "require_permissions"
   },
+  "vulnerable/04_insecure_yaml_load.py": {
+    "has_vuln": true,
+    "expected_context_gap": "yaml_safe_load"
+  },
+  "vulnerable/05_command_injection.py": {
+    "has_vuln": true,
+    "expected_context_gap": "shlex_quote"
+  },
   "safe/01_orm_correct.py": {
     "has_vuln": false,
     "expected_context_gap": ""
@@ -20,6 +28,14 @@
     "expected_context_gap": ""
   },
   "safe/03_with_auth_decorator.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "safe/04_safe_yaml_load.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "safe/05_safe_command.py": {
     "has_vuln": false,
     "expected_context_gap": ""
   }

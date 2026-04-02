@@ -37,6 +37,8 @@ class PolicyEngine:
             "raw_sqlite_query",
             "hardcoded_secret",
             "missing_auth_decorator",
+            "insecure_yaml_load",
+            "command_injection",
         }
         self.min_confidence = min_confidence
 

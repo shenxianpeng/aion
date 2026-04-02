@@ -76,10 +76,10 @@ def test_compute_repair_metrics_counts_results(monkeypatch) -> None:
     results = evaluate_repair_cases(cases, verify=True)
     metrics = compute_repair_metrics(results)
 
-    assert metrics.vulnerable_total == 3
-    assert metrics.safe_total == 3
-    assert metrics.repair_success_count == 3
-    assert metrics.verification_pass_count == 3
+    assert metrics.vulnerable_total == 5
+    assert metrics.safe_total == 5
+    assert metrics.repair_success_count == 5
+    assert metrics.verification_pass_count == 5
     assert metrics.false_fix_count == 0
     assert metrics.rollback_count == 0
     assert metrics.repair_success_rate == 1.0

@@ -43,3 +43,39 @@ def test_detects_route_missing_auth(tmp_path: Path) -> None:
     reasons = fallback_reasons(source, profile)
 
     assert any("auth" in reason.lower() for reason in reasons)
+
+
+def test_detects_insecure_yaml_load(tmp_path: Path) -> None:
+    source = tmp_path / "demo.py"
+    source.write_text(
+        "\n".join(
+            [
+                "import yaml",
+                "def load(data: str) -> dict:",
+                "    return yaml.load(data)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    reasons = fallback_reasons(source, ContextProfile())
+
+    assert any("yaml" in reason.lower() for reason in reasons)
+
+
+def test_detects_os_system_injection(tmp_path: Path) -> None:
+    source = tmp_path / "demo.py"
+    source.write_text(
+        "\n".join(
+            [
+                "import os",
+                "def run(name: str) -> int:",
+                '    return os.system(f"cmd {name}")',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    reasons = fallback_reasons(source, ContextProfile())
+
+    assert any("command injection" in reason.lower() for reason in reasons)

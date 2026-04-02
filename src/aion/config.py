@@ -14,6 +14,8 @@ class AppConfig:
         "raw_sqlite_query",
         "hardcoded_secret",
         "missing_auth_decorator",
+        "insecure_yaml_load",
+        "command_injection",
     ])
     auto_repair_min_confidence: float = 0.85
     sandbox_mode: str = "repository"

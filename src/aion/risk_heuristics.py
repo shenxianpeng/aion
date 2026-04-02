@@ -35,6 +35,10 @@ def fallback_reasons(target: Path, context_profile: ContextProfile) -> list[str]
         reasons.append("hardcoded secret-like assignment detected")
     if context_profile.auth_decorators and _has_route_without_auth(tree, context_profile.auth_decorators):
         reasons.append("route handler is missing the project's auth decorators")
+    if _has_insecure_yaml_load(tree):
+        reasons.append("yaml.load without SafeLoader allows arbitrary code execution via deserialization")
+    if _has_os_system_injection(tree):
+        reasons.append("os.system with f-string argument is vulnerable to command injection")
     return reasons
 
 
@@ -76,6 +80,28 @@ def _has_route_without_auth(tree: ast.AST, auth_decorators: list[str]) -> bool:
         has_auth = any(name and name.split(".")[-1] in allowed for name in decorator_names)
         if not has_auth:
             return True
+    return False
+
+
+def _has_insecure_yaml_load(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _render_name(node.func)
+            if name == "yaml.load":
+                # Flag only when no Loader keyword argument is provided
+                loader_kwarg = any(kw.arg == "Loader" for kw in node.keywords)
+                if not loader_kwarg:
+                    return True
+    return False
+
+
+def _has_os_system_injection(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _render_name(node.func)
+            if name == "os.system" and node.args:
+                if isinstance(node.args[0], ast.JoinedStr):
+                    return True
     return False
 
 
