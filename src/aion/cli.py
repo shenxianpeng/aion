@@ -449,7 +449,10 @@ def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None 
     return sorted(
         path
         for path in target.rglob("*.py")
-        if not any(part in {".git", ".venv", "venv", "node_modules", "__pycache__"} for part in path.parts)
+        if not any(
+            part in {".git", ".venv", "venv", "node_modules", "__pycache__", ".nox", ".tox", "site-packages", "dist-packages"}
+            for part in path.parts
+        )
         if not _matches_any_pattern(path, target, extra_ignore_patterns)
     )
 
