@@ -78,6 +78,17 @@ body {
   letter-spacing: 0.01em;
 }
 
+.md-tabs .md-tabs__link {
+  color: var(--aion-text);
+  opacity: 1;
+}
+
+.md-tabs .md-tabs__link:hover,
+.md-tabs .md-tabs__link--active {
+  color: var(--md-accent-fg-color);
+  opacity: 1;
+}
+
 .md-header__title,
 .md-nav__title,
 .md-typeset {
@@ -87,7 +98,6 @@ body {
 .md-header__button,
 .md-header__button:not(.md-logo),
 .md-header__topic,
-.md-tabs__link,
 .md-source,
 .md-search__icon,
 .md-search__icon svg,
@@ -98,7 +108,6 @@ body {
 }
 
 .md-header__button:hover,
-.md-tabs__link:hover,
 .md-source:hover,
 .md-select__button:hover {
   color: var(--md-accent-fg-color);
