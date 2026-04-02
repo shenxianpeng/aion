@@ -23,6 +23,9 @@ def _load_context(path: str) -> ContextProfile:
         ("tests/fixtures/vulnerable/03_missing_auth_decorator.py", "tests/fixtures/vulnerable/03_context.json", "inject_auth_decorator"),
         ("tests/fixtures/vulnerable/04_insecure_yaml_load.py", "tests/fixtures/vulnerable/04_context.json", "safe_yaml_load"),
         ("tests/fixtures/vulnerable/05_command_injection.py", "tests/fixtures/vulnerable/05_context.json", "shlex_quote_command"),
+        ("tests/fixtures/vulnerable/06_eval_injection.py", "tests/fixtures/vulnerable/06_context.json", "ast_literal_eval"),
+        ("tests/fixtures/vulnerable/07_subprocess_injection.py", "tests/fixtures/vulnerable/07_context.json", "shlex_quote_subprocess"),
+        ("tests/fixtures/vulnerable/08_weak_cryptography.py", "tests/fixtures/vulnerable/08_context.json", "upgrade_hash_algorithm"),
     ],
 )
 def test_repair_pipeline_generates_verified_fix(
@@ -248,10 +251,10 @@ def test_cli_repair_eval_outputs_metrics_and_records(monkeypatch: pytest.MonkeyP
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["metrics"]["repair_success_count"] == 5
-    assert payload["metrics"]["verification_pass_count"] == 5
+    assert payload["metrics"]["repair_success_count"] == 8
+    assert payload["metrics"]["verification_pass_count"] == 8
     assert payload["metrics"]["false_fix_count"] == 0
-    assert len(list(records_dir.glob("*.json"))) == 10
+    assert len(list(records_dir.glob("*.json"))) == 16
 
 
 def test_cli_process_event_outputs_json_and_persists_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

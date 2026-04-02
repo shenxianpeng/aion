@@ -39,6 +39,12 @@ def fallback_reasons(target: Path, context_profile: ContextProfile) -> list[str]
         reasons.append("yaml.load without SafeLoader allows arbitrary code execution via deserialization")
     if _has_os_system_injection(tree):
         reasons.append("os.system with f-string argument is vulnerable to command injection")
+    if _has_eval_injection(tree):
+        reasons.append("eval() with a non-constant argument enables arbitrary code execution")
+    if _has_subprocess_shell_injection(tree):
+        reasons.append("subprocess called with shell=True and f-string is vulnerable to command injection")
+    if _has_weak_cryptography(tree):
+        reasons.append("hashlib.md5 is a weak hash algorithm; use SHA-256 or stronger")
     return reasons
 
 
@@ -102,6 +108,41 @@ def _has_os_system_injection(tree: ast.AST) -> bool:
             if name == "os.system" and node.args:
                 if isinstance(node.args[0], ast.JoinedStr):
                     return True
+    return False
+
+
+def _has_eval_injection(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _render_name(node.func)
+            if name == "eval" and node.args:
+                if not isinstance(node.args[0], ast.Constant):
+                    return True
+    return False
+
+
+def _has_subprocess_shell_injection(tree: ast.AST) -> bool:
+    subprocess_funcs = {"subprocess.call", "subprocess.run", "subprocess.Popen"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _render_name(node.func)
+            if name in subprocess_funcs:
+                has_shell_true = any(
+                    isinstance(kw.value, ast.Constant) and kw.value.value is True
+                    for kw in node.keywords
+                    if kw.arg == "shell"
+                )
+                if has_shell_true and node.args and isinstance(node.args[0], ast.JoinedStr):
+                    return True
+    return False
+
+
+def _has_weak_cryptography(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _render_name(node.func)
+            if name == "hashlib.md5":
+                return True
     return False
 
 

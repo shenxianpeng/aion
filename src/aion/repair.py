@@ -122,6 +122,63 @@ class IncidentDetector:
                 )
             )
 
+        if self._has_eval_injection(content):
+            incidents.append(
+                Incident(
+                    id=self._incident_id(target, "eval_injection"),
+                    source="heuristic",
+                    target_file=normalize_path(target),
+                    issue_type="eval_injection",
+                    issue="eval() with user-controlled input enables arbitrary code execution.",
+                    severity="critical",
+                    line=self._line_for(content, "eval("),
+                    evidence=["eval() called with non-constant argument"],
+                    confidence=0.96,
+                    attack_surface="code_execution",
+                    recommended_action="auto_repair",
+                    remediation_strategy="ast_literal_eval",
+                    verification_strategy=["syntax", "eval_replaced"],
+                )
+            )
+
+        if self._has_subprocess_shell_injection(content):
+            incidents.append(
+                Incident(
+                    id=self._incident_id(target, "subprocess_shell_injection"),
+                    source="heuristic",
+                    target_file=normalize_path(target),
+                    issue_type="subprocess_shell_injection",
+                    issue="subprocess called with shell=True and an f-string is vulnerable to command injection.",
+                    severity="critical",
+                    line=self._line_for(content, "subprocess."),
+                    evidence=["subprocess with shell=True and f-string argument"],
+                    confidence=0.95,
+                    attack_surface="command_execution",
+                    recommended_action="auto_repair",
+                    remediation_strategy="shlex_quote_subprocess",
+                    verification_strategy=["syntax", "subprocess_shlex_quoted"],
+                )
+            )
+
+        if self._has_weak_cryptography(content):
+            incidents.append(
+                Incident(
+                    id=self._incident_id(target, "weak_cryptography"),
+                    source="heuristic",
+                    target_file=normalize_path(target),
+                    issue_type="weak_cryptography",
+                    issue="MD5 is a broken hash algorithm; use SHA-256 or stronger for security-sensitive operations.",
+                    severity="high",
+                    line=self._line_for(content, "hashlib.md5("),
+                    evidence=["hashlib.md5 used for security-sensitive hashing"],
+                    confidence=0.92,
+                    attack_surface="cryptography",
+                    recommended_action="auto_repair",
+                    remediation_strategy="upgrade_hash_algorithm",
+                    verification_strategy=["syntax", "weak_hash_removed"],
+                )
+            )
+
         return incidents
 
     def _has_raw_sqlite_issue(self, content: str) -> bool:
@@ -145,6 +202,18 @@ class IncidentDetector:
 
     def _has_command_injection(self, content: str) -> bool:
         return bool(re.search(r"os\.system\s*\(\s*f[\"']", content))
+
+    def _has_eval_injection(self, content: str) -> bool:
+        # Detect eval() where the argument is not a simple string or numeric constant
+        return bool(re.search(r'\beval\s*\(\s*(?!["\'\d])', content))
+
+    def _has_subprocess_shell_injection(self, content: str) -> bool:
+        return bool(
+            re.search(r"subprocess\.(call|run|Popen)\s*\(\s*f[\"'].*?shell\s*=\s*True", content, re.DOTALL)
+        )
+
+    def _has_weak_cryptography(self, content: str) -> bool:
+        return "hashlib.md5(" in content
 
     def _has_missing_auth_issue(self, content: str, context_profile: ContextProfile) -> bool:
         if "APIRouter" not in content or "@router." not in content:
@@ -231,6 +300,41 @@ class PatchPlanner:
                 ],
                 verification_steps=["syntax", "command_shlex_quoted"],
             )
+        if incident.issue_type == "eval_injection":
+            return RemediationPlan(
+                incident_id=incident.id,
+                target_file=incident.target_file,
+                strategy="ast_literal_eval",
+                summary="Replace eval() with ast.literal_eval() to safely evaluate literal Python expressions.",
+                planned_changes=[
+                    "Replace eval( with ast.literal_eval( to prevent arbitrary code execution.",
+                    "Import ast when needed.",
+                ],
+                verification_steps=["syntax", "eval_replaced"],
+            )
+        if incident.issue_type == "subprocess_shell_injection":
+            return RemediationPlan(
+                incident_id=incident.id,
+                target_file=incident.target_file,
+                strategy="shlex_quote_subprocess",
+                summary="Wrap subprocess f-string variables with shlex.quote to prevent shell injection.",
+                planned_changes=[
+                    "Wrap user-controlled variables in shlex.quote() inside subprocess f-string.",
+                    "Import shlex when needed.",
+                ],
+                verification_steps=["syntax", "subprocess_shlex_quoted"],
+            )
+        if incident.issue_type == "weak_cryptography":
+            return RemediationPlan(
+                incident_id=incident.id,
+                target_file=incident.target_file,
+                strategy="upgrade_hash_algorithm",
+                summary="Replace hashlib.md5 with hashlib.sha256 for security-sensitive hashing.",
+                planned_changes=[
+                    "Replace hashlib.md5( with hashlib.sha256( to use a stronger hash algorithm.",
+                ],
+                verification_steps=["syntax", "weak_hash_removed"],
+            )
         return None
 
     def _preferred_auth_decorator(self, context_profile: ContextProfile) -> str | None:
@@ -310,6 +414,12 @@ class PatchGenerator:
             return self._fix_yaml_load(content)
         if plan.strategy == "shlex_quote_command":
             return self._fix_command_injection(content)
+        if plan.strategy == "ast_literal_eval":
+            return self._fix_eval_injection(content)
+        if plan.strategy == "shlex_quote_subprocess":
+            return self._fix_subprocess_injection(content)
+        if plan.strategy == "upgrade_hash_algorithm":
+            return self._fix_weak_cryptography(content)
         return content
 
     def _parameterize_sqlite_query(self, content: str) -> str:
@@ -391,6 +501,50 @@ class PatchGenerator:
             if content.endswith("\n"):
                 updated += "\n"
         return updated
+
+    def _fix_eval_injection(self, content: str) -> str:
+        updated = re.sub(r"\beval\s*\(", "ast.literal_eval(", content)
+        if updated != content and "import ast" not in updated:
+            lines = updated.splitlines()
+            insert_at = 0
+            for i, line in enumerate(lines):
+                if line.startswith("import ") or line.startswith("from "):
+                    insert_at = i + 1
+            lines.insert(insert_at, "import ast")
+            updated = "\n".join(lines)
+            if content.endswith("\n"):
+                updated += "\n"
+        return updated
+
+    def _fix_subprocess_injection(self, content: str) -> str:
+        pattern = re.compile(
+            r"subprocess\.(?P<func>call|run|Popen)\s*\(\s*f(?P<quote>[\"'])(?P<cmd>[^{]*)\{(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)\}(?P<tail>[^\"']*?)(?P=quote)\s*,\s*shell\s*=\s*True\s*\)",
+        )
+
+        def repl(match: re.Match[str]) -> str:
+            func = match.group("func")
+            var = match.group("var")
+            cmd = match.group("cmd")
+            tail = match.group("tail")
+            quote = match.group("quote")
+            return f'subprocess.{func}(f{quote}{cmd}{{shlex.quote({var})}}{tail}{quote}, shell=True)'
+
+        updated = pattern.sub(repl, content, count=1)
+        if updated != content and "import shlex" not in updated:
+            lines = updated.splitlines()
+            insert_at = 0
+            for i, line in enumerate(lines):
+                if line.startswith("import subprocess"):
+                    insert_at = i + 1
+                    break
+            lines.insert(insert_at, "import shlex")
+            updated = "\n".join(lines)
+            if content.endswith("\n"):
+                updated += "\n"
+        return updated
+
+    def _fix_weak_cryptography(self, content: str) -> str:
+        return re.sub(r"\bhashlib\.md5\s*\(", "hashlib.sha256(", content)
 
     def _is_valid_python(self, content: str) -> bool:
         try:
@@ -536,6 +690,39 @@ class Verifier:
                 )
                 if not passed:
                     reasons.append("os.system call is not protected with shlex.quote.")
+            elif plan.strategy == "ast_literal_eval":
+                passed = "ast.literal_eval(" in patched and "import ast" in patched
+                checks.append(
+                    VerificationCheck(
+                        name="eval_replaced",
+                        passed=passed,
+                        details="eval() replaced with ast.literal_eval() to prevent arbitrary code execution.",
+                    )
+                )
+                if not passed:
+                    reasons.append("eval() was not replaced with ast.literal_eval().")
+            elif plan.strategy == "shlex_quote_subprocess":
+                passed = "shlex.quote(" in patched
+                checks.append(
+                    VerificationCheck(
+                        name="subprocess_shlex_quoted",
+                        passed=passed,
+                        details="subprocess f-string argument is wrapped with shlex.quote to prevent shell injection.",
+                    )
+                )
+                if not passed:
+                    reasons.append("subprocess call is not protected with shlex.quote.")
+            elif plan.strategy == "upgrade_hash_algorithm":
+                passed = "hashlib.sha256(" in patched and "hashlib.md5(" not in patched
+                checks.append(
+                    VerificationCheck(
+                        name="weak_hash_removed",
+                        passed=passed,
+                        details="hashlib.md5 replaced with hashlib.sha256 for stronger security.",
+                    )
+                )
+                if not passed:
+                    reasons.append("Weak hash algorithm hashlib.md5 still present after patching.")
 
         return not reasons, {"checks": checks, "reasons": reasons}
 

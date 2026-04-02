@@ -38,5 +38,29 @@
   "safe/05_safe_command.py": {
     "has_vuln": false,
     "expected_context_gap": ""
+  },
+  "vulnerable/06_eval_injection.py": {
+    "has_vuln": true,
+    "expected_context_gap": "ast_literal_eval"
+  },
+  "safe/06_safe_eval.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "vulnerable/07_subprocess_injection.py": {
+    "has_vuln": true,
+    "expected_context_gap": "shlex_quote_subprocess"
+  },
+  "safe/07_safe_subprocess.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
+  },
+  "vulnerable/08_weak_cryptography.py": {
+    "has_vuln": true,
+    "expected_context_gap": "upgrade_hash_algorithm"
+  },
+  "safe/08_strong_cryptography.py": {
+    "has_vuln": false,
+    "expected_context_gap": ""
   }
 }

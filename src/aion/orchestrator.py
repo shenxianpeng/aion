@@ -39,6 +39,9 @@ class PolicyEngine:
             "missing_auth_decorator",
             "insecure_yaml_load",
             "command_injection",
+            "eval_injection",
+            "subprocess_shell_injection",
+            "weak_cryptography",
         }
         self.min_confidence = min_confidence
 

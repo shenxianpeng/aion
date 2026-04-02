@@ -79,3 +79,56 @@ def test_detects_os_system_injection(tmp_path: Path) -> None:
     reasons = fallback_reasons(source, ContextProfile())
 
     assert any("command injection" in reason.lower() for reason in reasons)
+
+
+def test_detects_eval_injection(tmp_path: Path) -> None:
+    source = tmp_path / "demo.py"
+    source.write_text(
+        "\n".join(
+            [
+                "def evaluate(user_input: str) -> object:",
+                "    return eval(user_input)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    reasons = fallback_reasons(source, ContextProfile())
+
+    assert any("eval" in reason.lower() for reason in reasons)
+
+
+def test_detects_subprocess_shell_injection(tmp_path: Path) -> None:
+    source = tmp_path / "demo.py"
+    source.write_text(
+        "\n".join(
+            [
+                "import subprocess",
+                "def run(target: str) -> int:",
+                '    return subprocess.call(f"scan {target}", shell=True)',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    reasons = fallback_reasons(source, ContextProfile())
+
+    assert any("subprocess" in reason.lower() for reason in reasons)
+
+
+def test_detects_weak_cryptography(tmp_path: Path) -> None:
+    source = tmp_path / "demo.py"
+    source.write_text(
+        "\n".join(
+            [
+                "import hashlib",
+                "def compute_checksum(data: bytes) -> str:",
+                "    return hashlib.md5(data).hexdigest()",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    reasons = fallback_reasons(source, ContextProfile())
+
+    assert any("md5" in reason.lower() or "weak" in reason.lower() for reason in reasons)
