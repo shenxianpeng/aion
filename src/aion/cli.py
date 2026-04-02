@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from enum import Enum
@@ -118,6 +119,7 @@ def scan(
 
     analyzer = LLMAnalyzer(api_key=api_key, model=resolved_model, provider=resolved_provider.value, verbose=verbose)
     detector = IncidentDetector()
+    llm_failures: dict[str, list[str]] = {}
 
     for file_path in files_to_scan:
         report = ScanReport(file=normalize_path(file_path), ai_generated=True)
@@ -156,11 +158,22 @@ def scan(
                 )
                 report.mode = "llm-only" if not has_semgrep else "semgrep+llm"
         except LLMAnalyzerError as exc:
-            summary.warnings.append(f"LLM analysis failed for {file_path.name}: {exc}")
+            clean_msg = _clean_llm_error(str(exc))
+            llm_failures.setdefault(clean_msg, []).append(file_path.name)
             report.mode = "semgrep-only" if has_semgrep else "skipped"
         report.incidents = detector.detect(file_path, context_profile)
 
         summary.reports.append(report)
+
+    for error_msg, filenames in llm_failures.items():
+        if len(filenames) == 1:
+            summary.warnings.append(f"LLM analysis failed for {filenames[0]}: {error_msg}")
+        else:
+            summary.warnings.append(
+                f"LLM analysis failed for {len(filenames)} files ({', '.join(filenames[:3])}"
+                + (f" and {len(filenames) - 3} more" if len(filenames) > 3 else "")
+                + f"): {error_msg}"
+            )
 
     _exit_with_summary(summary, output)
 
@@ -447,7 +460,7 @@ def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None 
     return sorted(
         path
         for path in target.rglob("*.py")
-        if not any(part in {".git", ".venv", "venv", "node_modules", "__pycache__"} for part in path.parts)
+        if not any(part in {".git", ".nox", ".tox", ".venv", "venv", "node_modules", "__pycache__"} for part in path.parts)
         if not _matches_any_pattern(path, target, extra_ignore_patterns)
     )
 
@@ -461,6 +474,28 @@ def _matches_any_pattern(path: Path, root: Path, patterns: list[str]) -> bool:
         if Path(relative).match(pattern) or Path(path.name).match(pattern):
             return True
     return False
+
+
+def _clean_llm_error(exc_str: str) -> str:
+    """Extract a concise error message from a verbose LLM exception string.
+
+    The instructor library wraps retry attempts in XML-like tags. This strips
+    that boilerplate and returns only the core error message.
+    """
+    # Prefer the content of the <last_exception> tag when retries were attempted
+    match = re.search(r"<last_exception>\s*(.*?)\s*</last_exception>", exc_str, re.DOTALL)
+    if match:
+        exc_str = match.group(1).strip()
+    # Extract the 'message' field from provider error dicts, e.g. Anthropic/OpenAI
+    msg_match = re.search(r"'message':\s*'([^']+)'", exc_str)
+    if msg_match:
+        return msg_match.group(1)
+    # Fall back to the first non-empty line (avoids dumping raw XML to the user)
+    for line in exc_str.splitlines():
+        line = line.strip()
+        if line and not line.startswith("<"):
+            return line
+    return exc_str.strip()
 
 
 def _resolve_api_key(provider: Provider) -> str | None:

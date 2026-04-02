@@ -3,7 +3,7 @@ from pathlib import Path
 import aion.cli as cli_module
 from typer.testing import CliRunner
 
-from aion.cli import app
+from aion.cli import _clean_llm_error, app
 from aion.models import ContextProfile, Finding
 
 
@@ -195,3 +195,132 @@ def test_scan_honors_explicit_ai_generated_targets(monkeypatch, tmp_path: Path) 
 
     assert result.exit_code == 0
     assert scanned_files == ["selected.py"]
+
+
+def test_scan_excludes_nox_and_tox_directories(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    regular = tmp_path / "main.py"
+    regular.write_text("print('hi')\n", encoding="utf-8")
+    nox_file = tmp_path / ".nox" / "build-3-10" / "lib" / "site-packages" / "vendor.py"
+    nox_file.parent.mkdir(parents=True)
+    nox_file.write_text("# vendored\n", encoding="utf-8")
+    tox_file = tmp_path / ".tox" / "py310" / "lib" / "site-packages" / "pkg.py"
+    tox_file.parent.mkdir(parents=True)
+    tox_file.write_text("# vendored\n", encoding="utf-8")
+    scanned_files: list[str] = []
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(
+        cli_module.ContextExtractor,
+        "extract",
+        lambda self: ContextProfile(orm="sqlalchemy", scanned_files=1),
+    )
+    monkeypatch.setattr(cli_module, "semgrep_available", lambda: False)
+    monkeypatch.setattr(cli_module, "_git_history_has_ai_marker", lambda path, root: False)
+
+    class FakeAnalyzer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def analyze(self, target, context_profile, semgrep_findings, fallback_signals=None, console=None):
+            scanned_files.append(target.name)
+            return []
+
+        def estimate_tokens(self, target, context_profile):
+            return 1
+
+    monkeypatch.setattr(cli_module, "LLMAnalyzer", FakeAnalyzer)
+
+    result = runner.invoke(app, ["scan", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert scanned_files == ["main.py"]
+
+
+def test_scan_consolidates_repeated_llm_failures(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    for name in ("a.py", "b.py", "c.py", "d.py"):
+        (tmp_path / name).write_text("print('hi')\n", encoding="utf-8")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(
+        cli_module.ContextExtractor,
+        "extract",
+        lambda self: ContextProfile(orm="sqlalchemy", scanned_files=4),
+    )
+    monkeypatch.setattr(cli_module, "semgrep_available", lambda: False)
+    monkeypatch.setattr(cli_module, "_git_history_has_ai_marker", lambda path, root: False)
+
+    from aion.llm_analyzer import LLMAnalyzerError
+
+    class FakeAnalyzer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def analyze(self, target, context_profile, semgrep_findings, fallback_signals=None, console=None):
+            raise LLMAnalyzerError("Your credit balance is too low to access the Anthropic API.")
+
+        def estimate_tokens(self, target, context_profile):
+            return 1
+
+    monkeypatch.setattr(cli_module, "LLMAnalyzer", FakeAnalyzer)
+
+    result = runner.invoke(app, ["scan", str(tmp_path)])
+
+    assert result.exit_code == 0
+    # Should produce a single consolidated warning, not one per file
+    llm_warning_lines = [line for line in result.output.splitlines() if "LLM analysis failed" in line]
+    assert len(llm_warning_lines) == 1
+    assert "4 files" in result.output
+
+
+def test_clean_llm_error_strips_xml_and_extracts_message() -> None:
+    verbose_error = (
+        "<failed_attempts>\n<exception>\nError code: 400 - "
+        "{'type': 'error', 'error': {'type': 'invalid_request_error', "
+        "'message': 'Your credit balance is too low to access the Anthropic API.'}, "
+        "'request_id': 'req_abc'}\n</exception>\n</failed_attempts>\n"
+        "<last_exception>\nError code: 400 - "
+        "{'type': 'error', 'error': {'type': 'invalid_request_error', "
+        "'message': 'Your credit balance is too low to access the Anthropic API.'}, "
+        "'request_id': 'req_xyz'}\n</last_exception>"
+    )
+    result = _clean_llm_error(verbose_error)
+    assert result == "Your credit balance is too low to access the Anthropic API."
+
+
+def test_clean_llm_error_plain_message() -> None:
+    assert _clean_llm_error("simple error") == "simple error"
+
+
+def test_scan_single_llm_failure_uses_filename(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    (tmp_path / "only.py").write_text("print('hi')\n", encoding="utf-8")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(
+        cli_module.ContextExtractor,
+        "extract",
+        lambda self: ContextProfile(orm="sqlalchemy", scanned_files=1),
+    )
+    monkeypatch.setattr(cli_module, "semgrep_available", lambda: False)
+    monkeypatch.setattr(cli_module, "_git_history_has_ai_marker", lambda path, root: False)
+
+    from aion.llm_analyzer import LLMAnalyzerError
+
+    class FakeAnalyzer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def analyze(self, target, context_profile, semgrep_findings, fallback_signals=None, console=None):
+            raise LLMAnalyzerError("rate limit exceeded")
+
+        def estimate_tokens(self, target, context_profile):
+            return 1
+
+    monkeypatch.setattr(cli_module, "LLMAnalyzer", FakeAnalyzer)
+
+    result = runner.invoke(app, ["scan", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "LLM analysis failed for only.py: rate limit exceeded" in result.output
