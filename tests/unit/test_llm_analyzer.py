@@ -1,4 +1,4 @@
-from aion.llm_analyzer import LLMAnalyzer
+from aion.llm_analyzer import LLMAnalyzer, _extract_error_message
 from aion.models import Finding
 
 
@@ -49,3 +49,39 @@ def test_deduplicate_keeps_unique_findings() -> None:
     deduped = analyzer._deduplicate(findings)
 
     assert len(deduped) == 2
+
+
+def test_extract_error_message_strips_instructor_retry_xml() -> None:
+    raw = (
+        "\n\n<failed_attempts>\n\n"
+        "<exception>\n Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error',"
+        " 'message': 'Your credit balance is too low to access the Anthropic API.'}, 'request_id': 'req_1'}\n</exception>\n"
+        "<completion>\n None\n</completion>\n\n"
+        "</failed_attempts>\n\n"
+        "<last_exception>\n Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error',"
+        " 'message': 'Your credit balance is too low to access the Anthropic API.'}, 'request_id': 'req_1'}\n</last_exception>"
+    )
+
+    result = _extract_error_message(raw)
+
+    assert result == "Your credit balance is too low to access the Anthropic API."
+
+
+def test_extract_error_message_with_last_exception_only() -> None:
+    raw = (
+        "\n\n<last_exception>\n Error code: 400 - {'type': 'error',"
+        " 'error': {'type': 'invalid_request_error', 'message': 'Quota exceeded.'},"
+        " 'request_id': 'req_2'}\n</last_exception>"
+    )
+
+    result = _extract_error_message(raw)
+
+    assert result == "Quota exceeded."
+
+
+def test_extract_error_message_plain_string_unchanged() -> None:
+    raw = "instructor is not installed"
+
+    result = _extract_error_message(raw)
+
+    assert result == "instructor is not installed"

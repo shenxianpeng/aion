@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +13,20 @@ LLMProvider = Literal["anthropic", "openai", "gemini", "azure"]
 
 class LLMAnalyzerError(RuntimeError):
     pass
+
+
+def _extract_error_message(raw: str) -> str:
+    """Return a concise error message, stripping instructor's retry XML when present."""
+    # instructor wraps all retry attempts in <last_exception>…</last_exception>
+    match = re.search(r"<last_exception>\s*(.*?)\s*</last_exception>", raw, re.DOTALL)
+    last_exc = match.group(1).strip() if match else raw
+
+    # Try to extract the human-readable 'message' value from the API error dict
+    msg_match = re.search(r"'message':\s*'([^']+)'", last_exc)
+    if msg_match:
+        return msg_match.group(1)
+
+    return last_exc
 
 
 class LLMAnalyzer:
@@ -63,7 +78,7 @@ class LLMAnalyzer:
             try:
                 response = self._create_completion(client, prompt)
             except Exception as exc:  # noqa: BLE001
-                raise LLMAnalyzerError(str(exc)) from exc
+                raise LLMAnalyzerError(_extract_error_message(str(exc))) from exc
 
             for finding in response.findings:
                 findings.append(
