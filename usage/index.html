@@ -612,6 +612,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#7-track-security-drift-and-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Track security drift and evolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Track security drift and evolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#save-a-security-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save a security baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-for-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check for drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuous-watch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous watch mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-engine-health-and-learned-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect engine health and learned patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#operational-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -815,6 +876,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#7-track-security-drift-and-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Track security drift and evolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Track security drift and evolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#save-a-security-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save a security baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-for-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check for drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuous-watch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous watch mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-engine-health-and-learned-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect engine health and learned patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#operational-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -974,12 +1096,40 @@
 <li>dependency pin recommendations</li>
 <li>code-patch follow-up actions</li>
 </ul>
+<h2 id="7-track-security-drift-and-evolution">7. Track security drift and evolution<a class="headerlink" href="#7-track-security-drift-and-evolution" title="Permanent link">&para;</a></h2>
+<h3 id="save-a-security-baseline">Save a security baseline<a class="headerlink" href="#save-a-security-baseline" title="Permanent link">&para;</a></h3>
+<p>Capture the current security state of your repository:</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>snapshot<span class="w"> </span>./src<span class="w"> </span>--name<span class="w"> </span>baseline
+</code></pre></div>
+<p>This creates <code>.aion/snapshots/baseline.json</code> containing a health score, incident
+list, and file hashes — a reproducible fingerprint of the repository's security
+posture.</p>
+<h3 id="check-for-drift">Check for drift<a class="headerlink" href="#check-for-drift" title="Permanent link">&para;</a></h3>
+<p>Compare the current state against a saved snapshot to detect regressions:</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>drift<span class="w"> </span>./src<span class="w"> </span>--name<span class="w"> </span>baseline
+</code></pre></div>
+<p>Exit code <code>0</code> means no regression. Exit code <code>1</code> means new incidents were found.
+Use <code>--output json</code> to get a machine-readable drift report for CI integration.</p>
+<h3 id="continuous-watch-mode">Continuous watch mode<a class="headerlink" href="#continuous-watch-mode" title="Permanent link">&para;</a></h3>
+<p>Monitor a directory for security drift and auto-repair new incidents as they appear:</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>watch<span class="w"> </span>./src<span class="w"> </span>--interval<span class="w"> </span><span class="m">30</span><span class="w"> </span>--auto-repair
+</code></pre></div>
+<p>AION polls every <code>--interval</code> seconds, compares against the last known-good
+baseline, and automatically generates and verifies patches for any new incidents.
+Each successful repair is recorded in the knowledge base so future runs improve.</p>
+<h3 id="inspect-engine-health-and-learned-patterns">Inspect engine health and learned patterns<a class="headerlink" href="#inspect-engine-health-and-learned-patterns" title="Permanent link">&para;</a></h3>
+<p>Show accumulated snapshots and knowledge-base repair patterns:</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>status
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="c1"># or specify a custom .aion directory</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>status<span class="w"> </span>--aion-dir<span class="w"> </span>./.aion<span class="w"> </span>--output<span class="w"> </span>json
+</code></pre></div>
 <h2 id="operational-notes">Operational notes<a class="headerlink" href="#operational-notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The current release emits patch artifacts; it does not rewrite live production files in place.</li>
 <li><code>sandbox_verification_commands</code> run inside the staged workspace, not inside your working tree.</li>
 <li><code>process-event</code> and inbox processing automatically load <code>.aion.yaml</code> from the event repository root.</li>
 <li><code>repair-eval</code> reports repair success rate, verification pass rate, false-fix rate, and rollback rate.</li>
+<li>Drift snapshots and knowledge-base patterns are persisted in <code>.aion/</code> and survive restarts.</li>
 </ul>
 
 

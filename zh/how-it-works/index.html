@@ -680,7 +680,57 @@
   <a href="#9" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. 当前边界
+        9. 自我进化循环：漂移检测与持续学习
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 自我进化循环：漂移检测与持续学习">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        漂移检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        知识库
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        监控模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 当前边界
       
     </span>
   </a>
@@ -840,7 +890,57 @@
   <a href="#9" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. 当前边界
+        9. 自我进化循环：漂移检测与持续学习
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 自我进化循环：漂移检测与持续学习">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        漂移检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        知识库
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        监控模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 当前边界
       
     </span>
   </a>
@@ -973,7 +1073,49 @@
 <li>code patch follow-up</li>
 </ul>
 <p>它的默认倾向是先做 containment，再做代码 rollout。</p>
-<h2 id="9">9. 当前边界<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<h2 id="9">9. 自我进化循环：漂移检测与持续学习<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<p>AION 实现了一个持续自我改进的闭环：</p>
+<h3 id="_2">漂移检测<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p><code>aion snapshot</code> 在某一时刻捕获安全指纹（文件哈希 + 安全事件 + 健康评分）。
+<code>aion drift</code> 将实时状态与该基线对比，识别回退并计算健康变化量。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>默认位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>快照</td>
+<td><code>.aion/snapshots/</code></td>
+</tr>
+</tbody>
+</table>
+<p>健康评分是一个 0.0–1.0 的指标：1.0 表示无已知漏洞；
+数值越低表明事件严重程度和数量相对仓库规模越高。</p>
+<h3 id="_3">知识库<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>每一次成功修复都会以模式的形式记录到知识库。随着时间推移，引擎会针对每种问题类型
+和修复策略积累历史成功率。这些成功率会在修复时计算<strong>置信度加成</strong>，使已充分理解的
+问题类型得到更高置信度的处理。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>默认位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>修复模式</td>
+<td><code>.aion/knowledge/patterns.json</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">监控模式<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p><code>aion watch</code> 实现了外层循环：轮询 → 检测漂移 → 自动修复 → 记录 → 刷新基线。
+每次迭代都会利用知识库提升修复置信度。使用 <code>aion status</code> 可查看累积的状态。</p>
+<h2 id="10">10. 当前边界<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
 <p>当前版本停留在本地控制面决策和持久化 artifact 这一层。真实生产队列、部署系统、
 WAF API、feature flag provider 和自动发布系统，仍然是这些接口之上的适配工作。</p>
 

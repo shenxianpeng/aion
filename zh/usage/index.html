@@ -612,7 +612,68 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 追踪安全漂移与系统演进
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 追踪安全漂移与系统演进">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存安全基线快照
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查安全漂移
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        持续监控模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        查看引擎健康状态和已学习的修复模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         运行说明
@@ -815,7 +876,68 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 追踪安全漂移与系统演进
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 追踪安全漂移与系统演进">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存安全基线快照
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查安全漂移
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        持续监控模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        查看引擎健康状态和已学习的修复模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         运行说明
@@ -974,12 +1096,38 @@
 <li>dependency pin 建议</li>
 <li>code patch follow-up 动作</li>
 </ul>
-<h2 id="_3">运行说明<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<h2 id="7">7. 追踪安全漂移与系统演进<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<h3 id="_3">保存安全基线快照<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>捕获仓库当前的安全状态：</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>snapshot<span class="w"> </span>./src<span class="w"> </span>--name<span class="w"> </span>baseline
+</code></pre></div>
+<p>命令会生成 <code>.aion/snapshots/baseline.json</code>，其中包含健康评分、事件列表和文件哈希——
+即仓库安全态势的可复现指纹。</p>
+<h3 id="_4">检查安全漂移<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>将当前状态与已保存的快照对比，检测是否出现安全回退：</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>drift<span class="w"> </span>./src<span class="w"> </span>--name<span class="w"> </span>baseline
+</code></pre></div>
+<p>退出码 <code>0</code> 表示没有回退，退出码 <code>1</code> 表示发现了新的安全事件。
+使用 <code>--output json</code> 可获取机器可读的漂移报告，便于 CI 集成。</p>
+<h3 id="_5">持续监控模式<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>监控目录并在发现安全漂移时自动修复：</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>watch<span class="w"> </span>./src<span class="w"> </span>--interval<span class="w"> </span><span class="m">30</span><span class="w"> </span>--auto-repair
+</code></pre></div>
+<p>AION 每隔 <code>--interval</code> 秒轮询一次，将当前状态与上一个已知好的基线对比，
+并自动生成和验证新事件的修复补丁。每次成功修复都会记录到知识库，使后续修复持续改进。</p>
+<h3 id="_6">查看引擎健康状态和已学习的修复模式<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>显示已保存的快照和知识库中的修复模式：</p>
+<div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>status
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="c1"># 或指定自定义 .aion 目录</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>status<span class="w"> </span>--aion-dir<span class="w"> </span>./.aion<span class="w"> </span>--output<span class="w"> </span>json
+</code></pre></div>
+<h2 id="_7">运行说明<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
 <li>当前版本生成的是 patch artifact，不会直接原地改写生产文件。</li>
 <li><code>sandbox_verification_commands</code> 只会在 staged workspace 中执行，不会在你的工作树里直接运行。</li>
 <li><code>process-event</code> 和 inbox 处理会自动从事件仓库根目录加载 <code>.aion.yaml</code>。</li>
 <li><code>repair-eval</code> 会输出修复成功率、验证通过率、误修率和回滚率。</li>
+<li>漂移快照和知识库模式持久化在 <code>.aion/</code> 目录，服务重启后仍然保留。</li>
 </ul>
 
 
