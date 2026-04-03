@@ -194,9 +194,57 @@ The current defense planner can emit:
 - dependency pin recommendations
 - code-patch follow-up actions
 
+## 7. Track security drift and evolution
+
+### Save a security baseline
+
+Capture the current security state of your repository:
+
+```bash
+uv run aion snapshot ./src --name baseline
+```
+
+This creates `.aion/snapshots/baseline.json` containing a health score, incident
+list, and file hashes — a reproducible fingerprint of the repository's security
+posture.
+
+### Check for drift
+
+Compare the current state against a saved snapshot to detect regressions:
+
+```bash
+uv run aion drift ./src --name baseline
+```
+
+Exit code `0` means no regression. Exit code `1` means new incidents were found.
+Use `--output json` to get a machine-readable drift report for CI integration.
+
+### Continuous watch mode
+
+Monitor a directory for security drift and auto-repair new incidents as they appear:
+
+```bash
+uv run aion watch ./src --interval 30 --auto-repair
+```
+
+AION polls every `--interval` seconds, compares against the last known-good
+baseline, and automatically generates and verifies patches for any new incidents.
+Each successful repair is recorded in the knowledge base so future runs improve.
+
+### Inspect engine health and learned patterns
+
+Show accumulated snapshots and knowledge-base repair patterns:
+
+```bash
+uv run aion status
+# or specify a custom .aion directory
+uv run aion status --aion-dir ./.aion --output json
+```
+
 ## Operational notes
 
 - The current release emits patch artifacts; it does not rewrite live production files in place.
 - `sandbox_verification_commands` run inside the staged workspace, not inside your working tree.
 - `process-event` and inbox processing automatically load `.aion.yaml` from the event repository root.
 - `repair-eval` reports repair success rate, verification pass rate, false-fix rate, and rollback rate.
+- Drift snapshots and knowledge-base patterns are persisted in `.aion/` and survive restarts.

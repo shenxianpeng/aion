@@ -304,3 +304,178 @@ def test_scan_excludes_nox_and_site_packages(monkeypatch, tmp_path: Path) -> Non
     assert scanned_files == ["app.py"]
     assert "idnadata.py" not in scanned_files
     assert "helper.py" not in scanned_files
+
+
+# ---------------------------------------------------------------------------
+# snapshot command
+# ---------------------------------------------------------------------------
+
+
+def test_snapshot_creates_snapshot_file(tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "app.py"
+    target.write_text("print('hello')\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+
+    result = runner.invoke(
+        app,
+        ["snapshot", str(target), "--snapshots-dir", str(snaps_dir), "--name", "test"],
+    )
+
+    assert result.exit_code == 0
+    assert (snaps_dir / "test.json").exists()
+    assert "Snapshot" in result.output
+
+
+def test_snapshot_json_output(tmp_path: Path) -> None:
+    import json
+
+    runner = CliRunner()
+    target = tmp_path / "safe.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+
+    result = runner.invoke(
+        app,
+        ["snapshot", str(target), "--snapshots-dir", str(snaps_dir), "--output", "json"],
+    )
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert "health_score" in data
+    assert "incidents" in data
+
+
+# ---------------------------------------------------------------------------
+# drift command
+# ---------------------------------------------------------------------------
+
+
+def test_drift_no_regression(tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "safe.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+
+    # First create a baseline snapshot.
+    runner.invoke(
+        app,
+        ["snapshot", str(target), "--snapshots-dir", str(snaps_dir), "--name", "baseline"],
+    )
+
+    result = runner.invoke(
+        app,
+        ["drift", str(target), "--snapshots-dir", str(snaps_dir), "--name", "baseline"],
+    )
+
+    assert result.exit_code == 0
+    assert "CLEAN" in result.output
+
+
+def test_drift_missing_snapshot_fails(tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "safe.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+
+    result = runner.invoke(
+        app,
+        ["drift", str(target), "--snapshots-dir", str(snaps_dir), "--name", "nonexistent"],
+    )
+
+    assert result.exit_code == 2
+
+
+def test_drift_detects_regression(tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "app.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+
+    runner.invoke(
+        app,
+        ["snapshot", str(target), "--snapshots-dir", str(snaps_dir), "--name", "baseline"],
+    )
+
+    # Introduce a vulnerability.
+    target.write_text(
+        'import sqlite3\nconn=sqlite3.connect("db")\ncursor=conn.cursor()\n'
+        'uid="1"\ncursor.execute(f"SELECT * FROM t WHERE id = \'{uid}\'")\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["drift", str(target), "--snapshots-dir", str(snaps_dir), "--name", "baseline"],
+    )
+
+    assert result.exit_code == 1
+    assert "REGRESSION" in result.output
+
+
+# ---------------------------------------------------------------------------
+# status command
+# ---------------------------------------------------------------------------
+
+
+def test_status_empty_aion_dir(tmp_path: Path) -> None:
+    runner = CliRunner()
+    aion_dir = tmp_path / ".aion"
+
+    result = runner.invoke(app, ["status", "--aion-dir", str(aion_dir)])
+
+    assert result.exit_code == 0
+    assert "No snapshots" in result.output
+    assert "Knowledge base is empty" in result.output
+
+
+def test_status_shows_snapshots_and_kb(tmp_path: Path) -> None:
+    import json
+
+    runner = CliRunner()
+    target = tmp_path / "safe.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    aion_dir = tmp_path / ".aion"
+    snaps_dir = aion_dir / "snapshots"
+    kb_dir = aion_dir / "knowledge"
+
+    # Create a snapshot and record a KB pattern.
+    runner.invoke(
+        app,
+        ["snapshot", str(target), "--snapshots-dir", str(snaps_dir), "--name", "baseline"],
+    )
+
+    from aion.knowledge_base import KnowledgeBase
+    from aion.models import Incident, VerificationResult, PatchArtifact
+
+    kb = KnowledgeBase(base_dir=kb_dir)
+    incident = Incident(
+        id="test-001",
+        target_file="app.py",
+        issue_type="hardcoded_secret",
+        issue="test",
+        severity="critical",
+        line=1,
+        confidence=0.99,
+        remediation_strategy="env_secret",
+    )
+    artifact = PatchArtifact(
+        target_file="app.py",
+        original_content="",
+        patched_content="",
+        diff="",
+    )
+    verification = VerificationResult(
+        artifact=artifact,
+        verdict="verified_fix",
+        syntax_ok=True,
+        semgrep_ok=True,
+        assertions_ok=True,
+    )
+    kb.record_success(incident, verification)
+
+    result = runner.invoke(app, ["status", "--aion-dir", str(aion_dir)])
+
+    assert result.exit_code == 0
+    assert "baseline" in result.output
+    assert "hardcoded_secret" in result.output

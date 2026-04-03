@@ -110,7 +110,41 @@ actions such as:
 
 This keeps the system biased toward containment first and code rollout second.
 
-## 9. Current boundary
+## 9. Self-evolving loop: drift detection and learning
+
+AION implements a continuous self-improvement cycle:
+
+### Drift detection
+
+`aion snapshot` captures a security fingerprint (file hashes + incidents + health
+score) at a point in time. `aion drift` compares the live state against that
+baseline to identify regressions and compute a health delta.
+
+| State | Default location |
+|---|---|
+| Snapshots | `.aion/snapshots/` |
+
+The health score is a 0.0–1.0 metric: 1.0 means no known vulnerabilities;
+lower values reflect incident severity and count relative to repository size.
+
+### Knowledge base
+
+Every successful repair is recorded as a pattern in the knowledge base. Over
+time the engine accumulates historical success rates per issue type and
+remediation strategy. These rates are used to compute a **confidence boost** at
+repair time so that well-understood issue types are handled with higher certainty.
+
+| State | Default location |
+|---|---|
+| Repair patterns | `.aion/knowledge/patterns.json` |
+
+### Watch mode
+
+`aion watch` implements the outer loop: poll → detect drift → auto-repair →
+record → refresh baseline. Each iteration uses the knowledge base to improve
+patch confidence. Use `aion status` to inspect the accumulated state.
+
+## 10. Current boundary
 
 The current implementation stops at local control-plane decisions and persisted
 artifacts. Real production queues, deploy systems, WAF APIs, feature flag

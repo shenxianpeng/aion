@@ -194,9 +194,55 @@ uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
 - dependency pin 建议
 - code patch follow-up 动作
 
+## 7. 追踪安全漂移与系统演进
+
+### 保存安全基线快照
+
+捕获仓库当前的安全状态：
+
+```bash
+uv run aion snapshot ./src --name baseline
+```
+
+命令会生成 `.aion/snapshots/baseline.json`，其中包含健康评分、事件列表和文件哈希——
+即仓库安全态势的可复现指纹。
+
+### 检查安全漂移
+
+将当前状态与已保存的快照对比，检测是否出现安全回退：
+
+```bash
+uv run aion drift ./src --name baseline
+```
+
+退出码 `0` 表示没有回退，退出码 `1` 表示发现了新的安全事件。
+使用 `--output json` 可获取机器可读的漂移报告，便于 CI 集成。
+
+### 持续监控模式
+
+监控目录并在发现安全漂移时自动修复：
+
+```bash
+uv run aion watch ./src --interval 30 --auto-repair
+```
+
+AION 每隔 `--interval` 秒轮询一次，将当前状态与上一个已知好的基线对比，
+并自动生成和验证新事件的修复补丁。每次成功修复都会记录到知识库，使后续修复持续改进。
+
+### 查看引擎健康状态和已学习的修复模式
+
+显示已保存的快照和知识库中的修复模式：
+
+```bash
+uv run aion status
+# 或指定自定义 .aion 目录
+uv run aion status --aion-dir ./.aion --output json
+```
+
 ## 运行说明
 
 - 当前版本生成的是 patch artifact，不会直接原地改写生产文件。
 - `sandbox_verification_commands` 只会在 staged workspace 中执行，不会在你的工作树里直接运行。
 - `process-event` 和 inbox 处理会自动从事件仓库根目录加载 `.aion.yaml`。
 - `repair-eval` 会输出修复成功率、验证通过率、误修率和回滚率。
+- 漂移快照和知识库模式持久化在 `.aion/` 目录，服务重启后仍然保留。

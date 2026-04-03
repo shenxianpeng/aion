@@ -287,6 +287,45 @@ class InboxItem(BaseModel):
     result_path: str | None = None
     error: str | None = None
 
+class SecuritySnapshot(BaseModel):
+    """Point-in-time capture of a codebase's security state."""
+
+    target: str
+    created_at: str
+    file_hashes: dict[str, str] = Field(default_factory=dict)
+    incidents: list[Incident] = Field(default_factory=list)
+    health_score: float = 1.0
+
+
+class DriftReport(BaseModel):
+    """Comparison between two security snapshots."""
+
+    baseline_snapshot_time: str
+    current_snapshot_time: str
+    new_incidents: list[Incident] = Field(default_factory=list)
+    resolved_incidents: list[Incident] = Field(default_factory=list)
+    regressed_files: list[str] = Field(default_factory=list)
+    health_delta: float = 0.0
+    baseline_health_score: float = 1.0
+    current_health_score: float = 1.0
+
+    @property
+    def has_regression(self) -> bool:
+        return bool(self.new_incidents) or self.health_delta < 0
+
+
+class RepairPattern(BaseModel):
+    """A learned repair pattern derived from past successful fixes."""
+
+    issue_type: str
+    severity: Severity
+    strategy: str
+    confidence_boost: float = 0.05
+    success_count: int = 0
+    failure_count: int = 0
+    last_seen: str = ""
+
+
 def normalize_path(path: Path) -> str:
     try:
         return str(path.resolve())

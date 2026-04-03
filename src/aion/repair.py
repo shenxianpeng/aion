@@ -733,10 +733,12 @@ class RepairExecutor:
         detector: IncidentDetector | None = None,
         generator: PatchGenerator | None = None,
         verifier: Verifier | None = None,
+        knowledge_base=None,
     ):
         self.detector = detector or IncidentDetector()
         self.generator = generator or PatchGenerator()
         self.verifier = verifier or Verifier()
+        self.knowledge_base = knowledge_base  # optional KnowledgeBase; avoids circular import
 
     def run(
         self,
@@ -755,6 +757,12 @@ class RepairExecutor:
         verification = None
         if verify and artifact is not None:
             verification = self.verifier.verify(artifact)
+            if self.knowledge_base is not None:
+                for incident in incidents:
+                    if verification.verdict == "verified_fix":
+                        self.knowledge_base.record_success(incident, verification)
+                    else:
+                        self.knowledge_base.record_failure(incident)
 
         return RepairAttemptRecord(
             target=normalize_path(target),

@@ -14,8 +14,10 @@ from rich.table import Table
 
 from .config import AppConfig, ConfigError, load_app_config
 from .context_extractor import ContextExtractor
+from .drift_detector import DriftDetector
 from .evaluation import compute_repair_metrics, evaluate_repair_cases, load_fixture_cases
 from .inbox import EventInbox
+from .knowledge_base import KnowledgeBase
 from .llm_analyzer import LLMAnalyzer, LLMAnalyzerError
 from .models import (
     ContextProfile,
@@ -31,6 +33,7 @@ from .models import (
     RepairSession,
     RunIncidentResult,
     ScanReport,
+    SecuritySnapshot,
     VerificationResult,
     normalize_path,
 )
@@ -455,6 +458,246 @@ def serve_webhook(
         pass
     finally:
         server.server_close()
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def snapshot(
+    target: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
+    name: str = typer.Option("baseline", "--name", help="Snapshot name (used as filename in snapshots dir)."),
+    snapshots_dir: Path = typer.Option(Path(".aion/snapshots"), "--snapshots-dir", resolve_path=True),
+    context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
+    output: str = typer.Option("text", "--output", help="text or json"),
+) -> None:
+    """Save a point-in-time security snapshot of TARGET for later drift comparison."""
+    context_profile = _load_context_profile(target, context_file)
+    detector = DriftDetector(snapshots_dir=snapshots_dir)
+    snap = detector.snapshot(target, context_profile)
+    saved_path = detector.save_snapshot(snap, name=name)
+
+    if output == "json":
+        stdout_console.print_json(snap.model_dump_json())
+        raise typer.Exit(code=0)
+
+    incident_count = len(snap.incidents)
+    file_count = len(snap.file_hashes)
+    stdout_console.print(
+        Panel(
+            (
+                f"Target:    {snap.target}\n"
+                f"Snapshot:  {saved_path}\n"
+                f"Files:     {file_count}\n"
+                f"Incidents: {incident_count}\n"
+                f"Health:    {snap.health_score:.1%}"
+            ),
+            title="AION Snapshot",
+        )
+    )
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def drift(
+    target: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
+    name: str = typer.Option("baseline", "--name", help="Snapshot name to compare against."),
+    snapshots_dir: Path = typer.Option(Path(".aion/snapshots"), "--snapshots-dir", resolve_path=True),
+    context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
+    output: str = typer.Option("text", "--output", help="text or json"),
+) -> None:
+    """Compare TARGET's current security state against a saved snapshot."""
+    detector = DriftDetector(snapshots_dir=snapshots_dir)
+    baseline = detector.load_snapshot(name)
+    if baseline is None:
+        raise typer.BadParameter(
+            f"No snapshot '{name}' found in {snapshots_dir}. Run `aion snapshot` first."
+        )
+    context_profile = _load_context_profile(target, context_file)
+    current = detector.snapshot(target, context_profile)
+    report = detector.compare(baseline, current)
+
+    if output == "json":
+        stdout_console.print_json(report.model_dump_json())
+        raise typer.Exit(code=0)
+
+    delta_str = f"{report.health_delta:+.1%}"
+    status = "[red]REGRESSION[/red]" if report.has_regression else "[green]CLEAN[/green]"
+    stdout_console.print(
+        Panel(
+            (
+                f"Status:          {status}\n"
+                f"Health delta:    {delta_str}  "
+                f"({report.baseline_health_score:.1%} → {report.current_health_score:.1%})\n"
+                f"New incidents:   {len(report.new_incidents)}\n"
+                f"Resolved:        {len(report.resolved_incidents)}\n"
+                f"Regressed files: {len(report.regressed_files)}"
+            ),
+            title="AION Drift Report",
+        )
+    )
+    if report.new_incidents:
+        table = Table(title="New Incidents")
+        table.add_column("File")
+        table.add_column("Issue Type")
+        table.add_column("Severity")
+        table.add_column("Line", justify="right")
+        for incident in report.new_incidents:
+            table.add_row(incident.target_file, incident.issue_type, incident.severity, str(incident.line))
+        stdout_console.print(table)
+
+    exit_code = 1 if report.has_regression else 0
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def watch(
+    target: Path = typer.Argument(..., exists=True, readable=True, resolve_path=True),
+    interval: int = typer.Option(30, "--interval", help="Polling interval in seconds.", min=5),
+    snapshots_dir: Path = typer.Option(Path(".aion/snapshots"), "--snapshots-dir", resolve_path=True),
+    knowledge_dir: Path = typer.Option(Path(".aion/knowledge"), "--knowledge-dir", resolve_path=True),
+    context_file: Path | None = typer.Option(None, "--context-file", exists=True, readable=True, resolve_path=True),
+    auto_repair: bool = typer.Option(True, "--auto-repair/--no-auto-repair", help="Auto-repair detected incidents."),
+    max_cycles: int | None = typer.Option(None, "--max-cycles", help="Stop after N cycles (for testing)."),
+) -> None:
+    """Continuously monitor TARGET for security drift, auto-repairing new incidents."""
+    import time
+
+    kb = KnowledgeBase(base_dir=knowledge_dir)
+    detector = DriftDetector(snapshots_dir=snapshots_dir)
+    context_profile = _load_context_profile(target, context_file)
+
+    # Seed the baseline if one doesn't exist.
+    baseline = detector.load_snapshot("watch-baseline")
+    if baseline is None:
+        baseline = detector.snapshot(target, context_profile)
+        detector.save_snapshot(baseline, name="watch-baseline")
+        stdout_console.print(
+            Panel(
+                f"Baseline saved ({len(baseline.incidents)} incidents, health {baseline.health_score:.1%}).",
+                title="AION Watch — baseline",
+            )
+        )
+
+    stdout_console.print(
+        Panel(
+            f"Watching {target}  (interval={interval}s, auto_repair={auto_repair})",
+            title="AION Watch",
+        )
+    )
+    cycle = 0
+    try:
+        while True:
+            if max_cycles is not None and cycle >= max_cycles:
+                break
+            time.sleep(interval)
+            cycle += 1
+            context_profile = _load_context_profile(target, context_file)
+            current = detector.snapshot(target, context_profile)
+            report = detector.compare(baseline, current)
+
+            if report.has_regression:
+                stderr_console.print(
+                    f"[red]Cycle {cycle}: drift detected — {len(report.new_incidents)} new incident(s), "
+                    f"health {report.health_delta:+.1%}[/red]"
+                )
+                if auto_repair:
+                    repaired = 0
+                    executor = RepairExecutor(knowledge_base=kb)
+                    for incident in report.new_incidents:
+                        file_path = Path(incident.target_file)
+                        if file_path.exists():
+                            record = executor.run(file_path, context_profile, verify=True)
+                            if record.verification and record.verification.verdict == "verified_fix":
+                                repaired += 1
+                    if repaired:
+                        stderr_console.print(f"[green]  Auto-repaired {repaired} incident(s).[/green]")
+                        # Refresh baseline after successful repairs.
+                        baseline = detector.snapshot(target, context_profile)
+                        detector.save_snapshot(baseline, name="watch-baseline")
+                    else:
+                        stderr_console.print("[yellow]  No incidents could be auto-repaired; human review required.[/yellow]")
+            else:
+                stderr_console.print(f"Cycle {cycle}: no drift (health {current.health_score:.1%})")
+    except KeyboardInterrupt:
+        pass
+
+    stdout_console.print(Panel("Watch stopped.", title="AION Watch"))
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def status(
+    aion_dir: Path = typer.Option(Path(".aion"), "--aion-dir", resolve_path=True),
+    output: str = typer.Option("text", "--output", help="text or json"),
+) -> None:
+    """Show overall AION engine health: snapshots, knowledge base, and repair history."""
+    snapshots_dir = aion_dir / "snapshots"
+    knowledge_dir = aion_dir / "knowledge"
+
+    snapshots: list[dict[str, object]] = []
+    if snapshots_dir.exists():
+        for snap_file in sorted(snapshots_dir.glob("*.json")):
+            try:
+                snap = SecuritySnapshot.model_validate_json(snap_file.read_text(encoding="utf-8"))
+                snapshots.append({
+                    "name": snap_file.stem,
+                    "created_at": snap.created_at,
+                    "health_score": snap.health_score,
+                    "incidents": len(snap.incidents),
+                    "files": len(snap.file_hashes),
+                })
+            except Exception:  # noqa: BLE001
+                continue
+
+    kb = KnowledgeBase(base_dir=knowledge_dir)
+    kb_summary = kb.summary()
+
+    payload: dict[str, object] = {
+        "snapshots": snapshots,
+        "knowledge_base": kb_summary,
+    }
+
+    if output == "json":
+        stdout_console.print_json(json.dumps(payload))
+        raise typer.Exit(code=0)
+
+    if snapshots:
+        snap_table = Table(title="Security Snapshots")
+        snap_table.add_column("Name")
+        snap_table.add_column("Created")
+        snap_table.add_column("Files", justify="right")
+        snap_table.add_column("Incidents", justify="right")
+        snap_table.add_column("Health")
+        for s in snapshots:
+            snap_table.add_row(
+                str(s["name"]),
+                str(s["created_at"])[:19],
+                str(s["files"]),
+                str(s["incidents"]),
+                f"{float(str(s['health_score'])):.1%}",
+            )
+        stdout_console.print(snap_table)
+    else:
+        stdout_console.print("[dim]No snapshots found. Run `aion snapshot` to create one.[/dim]")
+
+    total_patterns = int(str(kb_summary["total_patterns"]))
+    if total_patterns:
+        kb_table = Table(title="Repair Knowledge Base")
+        kb_table.add_column("Issue Type")
+        kb_table.add_column("Strategy")
+        kb_table.add_column("✓ Success", justify="right")
+        kb_table.add_column("✗ Failed", justify="right")
+        for pattern in kb_summary.get("patterns", []):
+            if isinstance(pattern, dict):
+                kb_table.add_row(
+                    str(pattern.get("issue_type", "")),
+                    str(pattern.get("strategy", "")),
+                    str(pattern.get("success_count", 0)),
+                    str(pattern.get("failure_count", 0)),
+                )
+        stdout_console.print(kb_table)
+    else:
+        stdout_console.print("[dim]Knowledge base is empty. Repairs are recorded automatically.[/dim]")
+
     raise typer.Exit(code=0)
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
     extra_ignore_patterns = extra_ignore_patterns or []
