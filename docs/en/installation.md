@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.11 or newer
+- Python 3.10 or newer
 - `uv` for local environment management, or `pip` for package installation
 - Optional: `semgrep` for the fast rules-based first pass
 

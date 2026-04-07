@@ -7,7 +7,7 @@ name = "aion-evolve"
 dynamic = ["version"]
 description = "AION: The Self-Evolving Code Engine. Code Once, Live Forever."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "anthropic>=0.86.0",
     "instructor>=1.14.5",
