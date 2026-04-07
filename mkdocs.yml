@@ -11,6 +11,7 @@ theme:
   icon:
     logo: material/infinity
     repo: fontawesome/brands/github
+    alternate: material/earth
   font:
     text: Space Grotesk
     code: JetBrains Mono

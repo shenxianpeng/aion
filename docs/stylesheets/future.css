@@ -129,10 +129,46 @@ body {
   border: 1px solid var(--aion-border);
 }
 
+.md-header__option .md-select__button {
+  gap: 0.32rem;
+  padding: 0.3rem 0.72rem 0.3rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.md-header__option .md-select__button:hover {
+  color: var(--md-accent-fg-color);
+  border-color: color-mix(in srgb, var(--md-primary-fg-color) 35%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary-fg-color) 10%, transparent);
+}
+
 .md-select__inner {
   background: var(--aion-surface-strong);
   border: 1px solid var(--aion-border);
-  box-shadow: 0 30px 60px -32px var(--aion-glow);
+  border-radius: 1.1rem;
+  padding: 0.35rem;
+  min-width: 9rem;
+  box-shadow:
+    0 20px 50px -20px var(--aion-glow),
+    0 4px 16px -4px rgba(0, 0, 0, 0.08);
+}
+
+.md-select__link {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.md-select__item:hover .md-select__link {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 10%, transparent);
+  color: var(--md-primary-fg-color);
+  transform: translateX(2px);
 }
 
 .md-sidebar__scrollwrap,
