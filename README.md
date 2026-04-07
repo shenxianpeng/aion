@@ -153,6 +153,13 @@ Release and defense:
 - `aion rollback-release`
 - `aion plan-defense`
 
+Drift and monitoring:
+
+- `aion snapshot`
+- `aion drift`
+- `aion watch`
+- `aion status`
+
 ## Documentation
 
 Documentation is published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/).

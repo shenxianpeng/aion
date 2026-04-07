@@ -479,3 +479,186 @@ def test_status_shows_snapshots_and_kb(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "baseline" in result.output
     assert "hardcoded_secret" in result.output
+
+
+# ---------------------------------------------------------------------------
+# watch command
+# ---------------------------------------------------------------------------
+
+
+def test_watch_seeds_baseline_on_first_run(tmp_path: Path, monkeypatch) -> None:
+    """watch with --max-cycles 0 exits immediately after seeding the baseline."""
+    runner = CliRunner()
+    target = tmp_path / "app.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+    knowledge_dir = tmp_path / "knowledge"
+
+    # Patch time.sleep so the test is instant even if max_cycles > 0.
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    result = runner.invoke(
+        app,
+        [
+            "watch",
+            str(target),
+            "--snapshots-dir", str(snaps_dir),
+            "--knowledge-dir", str(knowledge_dir),
+            "--max-cycles", "0",
+            "--interval", "5",
+        ],
+    )
+
+    assert result.exit_code == 0
+    # Baseline snapshot file must have been written.
+    assert (snaps_dir / "watch-baseline.json").exists()
+    assert "Baseline saved" in result.output
+
+
+def test_watch_detects_no_drift_when_file_unchanged(tmp_path: Path, monkeypatch) -> None:
+    """watch with --max-cycles 1 reports no drift when the target is unchanged."""
+    runner = CliRunner()
+    target = tmp_path / "app.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+    knowledge_dir = tmp_path / "knowledge"
+
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    result = runner.invoke(
+        app,
+        [
+            "watch",
+            str(target),
+            "--snapshots-dir", str(snaps_dir),
+            "--knowledge-dir", str(knowledge_dir),
+            "--max-cycles", "1",
+            "--interval", "5",
+            "--no-auto-repair",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "no drift" in result.output
+
+
+def test_watch_detects_drift_on_new_vulnerability(tmp_path: Path, monkeypatch) -> None:
+    """watch with --max-cycles 1 reports drift when a vulnerability is introduced."""
+    runner = CliRunner()
+    target = tmp_path / "app.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    snaps_dir = tmp_path / "snaps"
+    knowledge_dir = tmp_path / "knowledge"
+
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    # Seed a clean baseline first (max_cycles=0).
+    runner.invoke(
+        app,
+        [
+            "watch",
+            str(target),
+            "--snapshots-dir", str(snaps_dir),
+            "--knowledge-dir", str(knowledge_dir),
+            "--max-cycles", "0",
+            "--interval", "5",
+        ],
+    )
+
+    # Introduce a raw SQLite vulnerability.
+    target.write_text(
+        'import sqlite3\nconn=sqlite3.connect("db")\ncursor=conn.cursor()\n'
+        'uid="1"\ncursor.execute(f"SELECT * FROM t WHERE id = \'{uid}\'")\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "watch",
+            str(target),
+            "--snapshots-dir", str(snaps_dir),
+            "--knowledge-dir", str(knowledge_dir),
+            "--max-cycles", "1",
+            "--interval", "5",
+            "--no-auto-repair",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "drift detected" in result.output
+
+
+# ---------------------------------------------------------------------------
+# serve-webhook command
+# ---------------------------------------------------------------------------
+
+
+def test_serve_webhook_starts_and_accepts_event(tmp_path: Path, monkeypatch) -> None:
+    """serve-webhook CLI command starts a server and enqueues a POST /events payload."""
+    import json
+    import threading
+    import urllib.request
+
+    from aion.inbox import EventInbox
+
+    inbox_root = tmp_path / "inbox"
+    runner = CliRunner()
+
+    # Capture the port printed by the CLI so we can POST to it.
+    # We replace WebhookEventServer with a subclass that records the bound port
+    # via a threading.Event so the main thread knows when to send the request.
+    port_event = threading.Event()
+    captured_port: list[int] = []
+
+    original_server_cls = cli_module.WebhookEventServer
+
+    class PatchedWebhookServer(original_server_cls):  # type: ignore[misc]
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            captured_port.append(self.server_port)
+            port_event.set()
+
+    monkeypatch.setattr(cli_module, "WebhookEventServer", PatchedWebhookServer)
+
+    # Run the CLI command in a background thread. The server stops after max_events=1.
+    cli_results: list = []
+
+    def _run_cli() -> None:
+        r = runner.invoke(
+            app,
+            [
+                "serve-webhook",
+                "--inbox-root", str(inbox_root),
+                "--host", "127.0.0.1",
+                "--port", "0",
+                "--max-events", "1",
+            ],
+        )
+        cli_results.append(r)
+
+    thread = threading.Thread(target=_run_cli, daemon=True)
+    thread.start()
+
+    # Wait until the server is bound.
+    port_event.wait(timeout=5)
+    assert captured_port, "Server did not bind within timeout"
+
+    payload = json.dumps({"event_type": "runtime_alert", "target_file": "/tmp/demo.py"}).encode()
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{captured_port[0]}/events",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        body = json.loads(resp.read().decode())
+    assert body["status"] == "pending"
+
+    thread.join(timeout=5)
+    assert cli_results, "CLI thread did not finish"
+    assert cli_results[0].exit_code == 0
+
+    items = EventInbox(inbox_root).list_items(status="pending")
+    assert len(items) == 1
+    assert items[0].event.event_type == "runtime_alert"

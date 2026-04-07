@@ -103,3 +103,36 @@ def test_cli_release_commands(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert json.loads(rollback.stdout)["state"] == "rolled_back"
 
     orchestrator.cleanup_sandbox(result)
+
+
+def test_cli_reject_release(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    result, orchestrator = _make_result(monkeypatch, tmp_path)
+    runner = CliRunner()
+    result_path = tmp_path / "orchestration.json"
+    releases_root = tmp_path / "releases"
+    result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+    create = runner.invoke(
+        app,
+        ["create-release-candidate", str(result_path), "--releases-root", str(releases_root), "--output", "json"],
+    )
+    assert create.exit_code == 0
+    candidate_id = json.loads(create.stdout)["candidate_id"]
+
+    reject = runner.invoke(
+        app,
+        [
+            "reject-release",
+            candidate_id,
+            "--approver", "bob",
+            "--reason", "policy violation",
+            "--releases-root", str(releases_root),
+            "--output", "json",
+        ],
+    )
+    assert reject.exit_code == 0
+    payload = json.loads(reject.stdout)
+    assert payload["state"] == "rejected"
+    assert any("policy violation" in h for h in payload["history"])
+
+    orchestrator.cleanup_sandbox(result)
