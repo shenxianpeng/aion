@@ -5,177 +5,265 @@ import difflib
 import hashlib
 import re
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import (
     ContextProfile,
+    Finding,
     Incident,
     PatchArtifact,
     RepairAttemptRecord,
     RemediationPlan,
+    SemgrepFinding,
     VerificationCheck,
     VerificationResult,
     normalize_path,
 )
+from .risk_heuristics import fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
 
 
+@dataclass
+class DetectionOutcome:
+    incidents: list[Incident]
+    semgrep_findings: list[SemgrepFinding]
+    llm_findings: list[Finding]
+    fallback_signals: list[str]
+    warnings: list[str]
+    mode: str
+
+
 class IncidentDetector:
-    def detect(self, target: Path, context_profile: ContextProfile) -> list[Incident]:
+    _SUPPORTED_INCIDENTS: dict[str, dict[str, object]] = {
+        "raw_sqlite_query": {
+            "issue": "Raw sqlite query bypasses project database safety patterns.",
+            "severity": "high",
+            "attack_surface": "database",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "parameterize_sqlite_query",
+            "verification_strategy": ["syntax", "semgrep", "sqlite_parameterization"],
+        },
+        "hardcoded_secret": {
+            "issue": "Hardcoded secret should be loaded from environment variables.",
+            "severity": "critical",
+            "attack_surface": "credential",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "env_secret",
+            "verification_strategy": ["syntax", "secret_removed", "semgrep"],
+        },
+        "missing_auth_decorator": {
+            "issue": "Route handler bypasses the repository's auth decorator pattern.",
+            "severity": "high",
+            "attack_surface": "http",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "inject_auth_decorator",
+            "verification_strategy": ["syntax", "auth_decorator_present"],
+        },
+        "insecure_yaml_load": {
+            "issue": "yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
+            "severity": "critical",
+            "attack_surface": "deserialization",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "safe_yaml_load",
+            "verification_strategy": ["syntax", "yaml_safe_load", "semgrep"],
+        },
+        "command_injection": {
+            "issue": "os.system with an f-string argument is vulnerable to shell command injection.",
+            "severity": "critical",
+            "attack_surface": "command_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "shlex_quote_command",
+            "verification_strategy": ["syntax", "command_shlex_quoted"],
+        },
+        "eval_injection": {
+            "issue": "eval() with user-controlled input enables arbitrary code execution.",
+            "severity": "critical",
+            "attack_surface": "code_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "ast_literal_eval",
+            "verification_strategy": ["syntax", "eval_replaced"],
+        },
+        "subprocess_shell_injection": {
+            "issue": "subprocess called with shell=True and an f-string is vulnerable to command injection.",
+            "severity": "critical",
+            "attack_surface": "command_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "shlex_quote_subprocess",
+            "verification_strategy": ["syntax", "subprocess_shlex_quoted"],
+        },
+        "weak_cryptography": {
+            "issue": "MD5 is a broken hash algorithm; use SHA-256 or stronger for security-sensitive operations.",
+            "severity": "high",
+            "attack_surface": "cryptography",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "upgrade_hash_algorithm",
+            "verification_strategy": ["syntax", "weak_hash_removed"],
+        },
+    }
+
+    def __init__(
+        self,
+        semgrep_runner: SemgrepRunner | None = None,
+        llm_analyzer=None,
+    ) -> None:
+        self.semgrep_runner = semgrep_runner
+        self.llm_analyzer = llm_analyzer
+
+    def analyze(
+        self,
+        target: Path,
+        context_profile: ContextProfile,
+        fallback_signals: list[str] | None = None,
+        console=None,
+    ) -> DetectionOutcome:
         content = target.read_text(encoding="utf-8", errors="ignore")
+        signals = fallback_signals if fallback_signals is not None else fallback_reasons(target, context_profile)
+        warnings: list[str] = []
+        semgrep_findings: list[SemgrepFinding] = []
+        llm_findings: list[Finding] = []
+        mode = "heuristic-only"
+
+        if self.semgrep_runner is not None:
+            try:
+                semgrep_findings = self.semgrep_runner.run(target)
+                mode = "semgrep-only"
+            except SemgrepError as exc:
+                warnings.append(f"semgrep failed: {exc}")
+
+        should_run_llm = self.llm_analyzer is not None and ((self.semgrep_runner is None) or bool(semgrep_findings) or bool(signals))
+        if should_run_llm:
+            try:
+                llm_findings = self.llm_analyzer.analyze(
+                    target,
+                    context_profile,
+                    semgrep_findings,
+                    fallback_signals=signals,
+                    console=console,
+                )
+                mode = "llm-only" if self.semgrep_runner is None else "semgrep+llm"
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"LLM analysis failed: {exc}")
+                if self.semgrep_runner is None:
+                    mode = "heuristic-only"
+
+        incidents = self._deduplicate_incidents(
+            [
+                *self._detect_heuristics(target, content, context_profile),
+                *self._incidents_from_semgrep(target, semgrep_findings),
+                *self._incidents_from_llm(target, llm_findings),
+            ]
+        )
+        return DetectionOutcome(
+            incidents=incidents,
+            semgrep_findings=semgrep_findings,
+            llm_findings=llm_findings,
+            fallback_signals=signals,
+            warnings=warnings,
+            mode=mode,
+        )
+
+    def detect(self, target: Path, context_profile: ContextProfile) -> list[Incident]:
+        return self.analyze(target, context_profile).incidents
+
+    def _detect_heuristics(self, target: Path, content: str, context_profile: ContextProfile) -> list[Incident]:
         incidents: list[Incident] = []
 
         if self._has_raw_sqlite_issue(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "raw_sqlite_query"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="raw_sqlite_query",
-                    issue="Raw sqlite query bypasses project database safety patterns.",
-                    severity="high",
+                self._make_supported_incident(
+                    target,
+                    "raw_sqlite_query",
                     line=self._line_for(content, "cursor.execute"),
                     evidence=["sqlite3.connect", "cursor.execute(f-string)"],
                     confidence=0.93,
-                    attack_surface="database",
-                    recommended_action="auto_repair",
-                    remediation_strategy="parameterize_sqlite_query",
-                    verification_strategy=["syntax", "semgrep", "sqlite_parameterization"],
+                    source="heuristic",
                 )
             )
 
         secret_match = self._find_hardcoded_secret(content)
         if secret_match:
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "hardcoded_secret"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="hardcoded_secret",
-                    issue="Hardcoded secret should be loaded from environment variables.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "hardcoded_secret",
                     line=self._line_for(content, secret_match.group(0)),
                     evidence=[secret_match.group(0).strip()],
                     confidence=0.98,
-                    attack_surface="credential",
-                    recommended_action="auto_repair",
-                    remediation_strategy="env_secret",
-                    verification_strategy=["syntax", "secret_removed", "semgrep"],
+                    source="heuristic",
                 )
             )
 
         if self._has_missing_auth_issue(content, context_profile):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "missing_auth_decorator"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="missing_auth_decorator",
-                    issue="Route handler bypasses the repository's auth decorator pattern.",
-                    severity="high",
+                self._make_supported_incident(
+                    target,
+                    "missing_auth_decorator",
                     line=self._line_for(content, "@router."),
                     evidence=["APIRouter route without project auth decorator"],
                     confidence=0.88,
-                    attack_surface="http",
-                    recommended_action="auto_repair",
-                    remediation_strategy="inject_auth_decorator",
-                    verification_strategy=["syntax", "auth_decorator_present"],
+                    source="heuristic",
                 )
             )
 
         if self._has_insecure_yaml_load(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "insecure_yaml_load"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="insecure_yaml_load",
-                    issue="yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "insecure_yaml_load",
                     line=self._line_for(content, "yaml.load("),
                     evidence=["yaml.load called without SafeLoader"],
                     confidence=0.97,
-                    attack_surface="deserialization",
-                    recommended_action="auto_repair",
-                    remediation_strategy="safe_yaml_load",
-                    verification_strategy=["syntax", "yaml_safe_load", "semgrep"],
+                    source="heuristic",
                 )
             )
 
         if self._has_command_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "command_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="command_injection",
-                    issue="os.system with an f-string argument is vulnerable to shell command injection.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "command_injection",
                     line=self._line_for(content, "os.system("),
                     evidence=["os.system(f-string)"],
                     confidence=0.95,
-                    attack_surface="command_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="shlex_quote_command",
-                    verification_strategy=["syntax", "command_shlex_quoted"],
+                    source="heuristic",
                 )
             )
 
         if self._has_eval_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "eval_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="eval_injection",
-                    issue="eval() with user-controlled input enables arbitrary code execution.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "eval_injection",
                     line=self._line_for(content, "eval("),
                     evidence=["eval() called with non-constant argument"],
                     confidence=0.96,
-                    attack_surface="code_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="ast_literal_eval",
-                    verification_strategy=["syntax", "eval_replaced"],
+                    source="heuristic",
                 )
             )
 
         if self._has_subprocess_shell_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "subprocess_shell_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="subprocess_shell_injection",
-                    issue="subprocess called with shell=True and an f-string is vulnerable to command injection.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "subprocess_shell_injection",
                     line=self._line_for(content, "subprocess."),
                     evidence=["subprocess with shell=True and f-string argument"],
                     confidence=0.95,
-                    attack_surface="command_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="shlex_quote_subprocess",
-                    verification_strategy=["syntax", "subprocess_shlex_quoted"],
+                    source="heuristic",
                 )
             )
 
         if self._has_weak_cryptography(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "weak_cryptography"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="weak_cryptography",
-                    issue="MD5 is a broken hash algorithm; use SHA-256 or stronger for security-sensitive operations.",
-                    severity="high",
+                self._make_supported_incident(
+                    target,
+                    "weak_cryptography",
                     line=self._line_for(content, "hashlib.md5("),
                     evidence=["hashlib.md5 used for security-sensitive hashing"],
                     confidence=0.92,
-                    attack_surface="cryptography",
-                    recommended_action="auto_repair",
-                    remediation_strategy="upgrade_hash_algorithm",
-                    verification_strategy=["syntax", "weak_hash_removed"],
+                    source="heuristic",
                 )
             )
 
@@ -225,8 +313,159 @@ class IncidentDetector:
         decorators = route_block.group(1)
         return bool(auth_markers) and not any(marker in decorators for marker in auth_markers)
 
-    def _incident_id(self, target: Path, issue_type: str) -> str:
-        digest = hashlib.sha256(f"{normalize_path(target)}:{issue_type}".encode("utf-8")).hexdigest()
+    def _make_supported_incident(
+        self,
+        target: Path,
+        issue_type: str,
+        *,
+        line: int,
+        evidence: list[str],
+        confidence: float,
+        source: str,
+    ) -> Incident:
+        metadata = self._SUPPORTED_INCIDENTS[issue_type]
+        return Incident(
+            id=self._incident_id(target, issue_type, line),
+            source=source,  # type: ignore[arg-type]
+            target_file=normalize_path(target),
+            issue_type=issue_type,
+            issue=str(metadata["issue"]),
+            severity=metadata["severity"],  # type: ignore[arg-type]
+            line=line,
+            evidence=evidence,
+            confidence=confidence,
+            attack_surface=str(metadata["attack_surface"]),
+            recommended_action=str(metadata["recommended_action"]),
+            remediation_strategy=str(metadata["remediation_strategy"]),
+            verification_strategy=list(metadata["verification_strategy"]),
+        )
+
+    def _incidents_from_semgrep(self, target: Path, findings: list[SemgrepFinding]) -> list[Incident]:
+        incidents: list[Incident] = []
+        for finding in findings:
+            issue_type = self._infer_issue_type(" ".join(filter(None, [finding.check_id, finding.message, finding.code or ""])))
+            if issue_type is None:
+                incidents.append(
+                    self._make_review_incident(
+                        target,
+                        issue_type="semgrep_review",
+                        line=finding.line,
+                        issue=finding.message or finding.check_id,
+                        severity=self._severity_from_semgrep(finding.severity),
+                        evidence=[finding.check_id, finding.message],
+                        confidence=0.70,
+                    )
+                )
+                continue
+            incidents.append(
+                self._make_supported_incident(
+                    target,
+                    issue_type,
+                    line=finding.line,
+                    evidence=[finding.check_id, finding.message],
+                    confidence=0.90,
+                    source="scan",
+                )
+            )
+        return incidents
+
+    def _incidents_from_llm(self, target: Path, findings: list[Finding]) -> list[Incident]:
+        incidents: list[Incident] = []
+        for finding in findings:
+            issue_type = self._infer_issue_type(" ".join([finding.issue, finding.context_gap, finding.fix]))
+            if issue_type is None:
+                incidents.append(
+                    self._make_review_incident(
+                        target,
+                        issue_type="llm_review",
+                        line=finding.line,
+                        issue=finding.issue,
+                        severity=finding.severity,
+                        evidence=[finding.context_gap, finding.fix],
+                        confidence=0.75,
+                    )
+                )
+                continue
+            incidents.append(
+                self._make_supported_incident(
+                    target,
+                    issue_type,
+                    line=finding.line,
+                    evidence=[finding.issue, finding.context_gap, finding.fix],
+                    confidence=0.85,
+                    source="scan",
+                )
+            )
+        return incidents
+
+    def _make_review_incident(
+        self,
+        target: Path,
+        *,
+        issue_type: str,
+        line: int,
+        issue: str,
+        severity,
+        evidence: list[str],
+        confidence: float,
+    ) -> Incident:
+        return Incident(
+            id=self._incident_id(target, issue_type, line),
+            source="scan",
+            target_file=normalize_path(target),
+            issue_type=issue_type,
+            issue=issue,
+            severity=severity,
+            line=line,
+            evidence=evidence,
+            confidence=confidence,
+            recommended_action="review",
+        )
+
+    def _infer_issue_type(self, text: str) -> str | None:
+        lowered = text.lower()
+        if "sqlite" in lowered and ("cursor.execute" in lowered or "sql injection" in lowered or "parameterized" in lowered):
+            return "raw_sqlite_query"
+        if "secret" in lowered or "api key" in lowered or "password" in lowered or "token" in lowered:
+            return "hardcoded_secret"
+        if "auth decorator" in lowered or "authentication decorator" in lowered or "missing auth" in lowered:
+            return "missing_auth_decorator"
+        if "yaml.load" in lowered or ("yaml" in lowered and "safe" in lowered):
+            return "insecure_yaml_load"
+        if "subprocess" in lowered and ("shell=true" in lowered or "command injection" in lowered):
+            return "subprocess_shell_injection"
+        if "os.system" in lowered or ("command injection" in lowered and "subprocess" not in lowered):
+            return "command_injection"
+        if "eval" in lowered:
+            return "eval_injection"
+        if "md5" in lowered or "hashlib.md5" in lowered or "sha-256" in lowered or "sha256" in lowered:
+            return "weak_cryptography"
+        return None
+
+    def _severity_from_semgrep(self, severity: str):
+        mapping = {
+            "ERROR": "high",
+            "WARNING": "medium",
+            "INFO": "low",
+        }
+        return mapping.get(severity.upper(), "medium")
+
+    def _deduplicate_incidents(self, incidents: list[Incident]) -> list[Incident]:
+        deduped: dict[tuple[str, str, int, str | None], Incident] = {}
+        for incident in incidents:
+            key = (
+                incident.target_file,
+                incident.issue_type,
+                incident.line,
+                incident.remediation_strategy,
+            )
+            existing = deduped.get(key)
+            if existing is None or incident.confidence > existing.confidence:
+                deduped[key] = incident
+        return sorted(deduped.values(), key=lambda incident: (incident.target_file, incident.line, incident.issue_type))
+
+    def _incident_id(self, target: Path, issue_type: str, line: int) -> str:
+        digest = hashlib.sha256(f"{normalize_path(target)}:{issue_type}:{line}".encode("utf-8")).hexdigest()
         return digest[:12]
 
     def _line_for(self, content: str, needle: str) -> int:

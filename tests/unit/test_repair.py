@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from aion.cli import app
 from aion.knowledge_base import KnowledgeBase
-from aion.models import ContextProfile, Incident, PatchArtifact, VerificationResult
+from aion.models import ContextProfile, Finding, Incident, PatchArtifact, SemgrepFinding, VerificationResult
 from aion.orchestrator import Orchestrator, PolicyEngine
 from aion.repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 
@@ -67,6 +67,72 @@ def test_repair_pipeline_skips_safe_fixture(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert incidents == []
     assert artifact is None
+
+
+def test_incident_detector_merges_semgrep_and_llm_findings_into_incidents(tmp_path: Path) -> None:
+    target = tmp_path / "demo.py"
+    target.write_text("print('hello')\n", encoding="utf-8")
+
+    class FakeSemgrepRunner:
+        def run(self, _target: Path) -> list[SemgrepFinding]:
+            return [
+                SemgrepFinding(
+                    check_id="python.lang.security.audit.eval-detected.eval-detected",
+                    path=str(target),
+                    line=3,
+                    severity="ERROR",
+                    message="Avoid eval",
+                )
+            ]
+
+    class FakeLLMAnalyzer:
+        def analyze(self, *_args, **_kwargs) -> list[Finding]:
+            return [
+                Finding(
+                    issue="Hardcoded secret in code",
+                    severity="critical",
+                    line=5,
+                    context_gap="Project stores secrets in environment variables.",
+                    fix="Load the value with os.getenv().",
+                )
+            ]
+
+    detector = IncidentDetector(semgrep_runner=FakeSemgrepRunner(), llm_analyzer=FakeLLMAnalyzer())
+
+    outcome = detector.analyze(
+        target,
+        ContextProfile(),
+        fallback_signals=["hardcoded secret-like assignment detected"],
+    )
+
+    assert {incident.issue_type for incident in outcome.incidents} == {"eval_injection", "hardcoded_secret"}
+    assert all(incident.source == "scan" for incident in outcome.incidents)
+    assert outcome.mode == "semgrep+llm"
+
+
+def test_incident_detector_deduplicates_supported_issue_types_across_sources(tmp_path: Path) -> None:
+    target = tmp_path / "demo.py"
+    target.write_text("result = eval(user_input)\n", encoding="utf-8")
+
+    class FakeSemgrepRunner:
+        def run(self, _target: Path) -> list[SemgrepFinding]:
+            return [
+                SemgrepFinding(
+                    check_id="python.lang.security.audit.eval-detected.eval-detected",
+                    path=str(target),
+                    line=1,
+                    severity="ERROR",
+                    message="Avoid eval",
+                )
+            ]
+
+    detector = IncidentDetector(semgrep_runner=FakeSemgrepRunner())
+
+    outcome = detector.analyze(target, ContextProfile(), fallback_signals=[])
+
+    eval_incidents = [incident for incident in outcome.incidents if incident.issue_type == "eval_injection"]
+    assert len(eval_incidents) == 1
+    assert eval_incidents[0].line == 1
 
 
 def test_orchestrator_runs_incident_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
