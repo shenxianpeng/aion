@@ -719,6 +719,56 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-6-product-proof-before-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Product proof before scale
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 6: Product proof before scale">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#icp-for-the-next-cycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ICP for the next cycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#90-day-execution-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        90-day execution plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go-no-go-scorecard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go / no-go scorecard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -875,6 +925,56 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-6-product-proof-before-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Product proof before scale
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 6: Product proof before scale">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#icp-for-the-next-cycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ICP for the next cycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#90-day-execution-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        90-day execution plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go-no-go-scorecard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go / no-go scorecard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -980,6 +1080,50 @@ self-healing.</p>
 <li>approval and audit integration with external systems</li>
 <li>richer repository test selection instead of only configured command lists</li>
 </ul>
+<h3 id="phase-6-product-proof-before-scale">Phase 6: Product proof before scale<a class="headerlink" href="#phase-6-product-proof-before-scale" title="Permanent link">&para;</a></h3>
+<p>Before adding more adapters, AION should prove it can reliably reduce security
+and operations toil for at least one clear ideal customer profile (ICP). The
+priority is measurable product impact, not feature count.</p>
+<h4 id="icp-for-the-next-cycle">ICP for the next cycle<a class="headerlink" href="#icp-for-the-next-cycle" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Python platform teams maintaining 10-50 services</li>
+<li>Existing Semgrep and CI usage, but no standardized automated remediation</li>
+<li>Need for auditable, approval-based rollout due to compliance requirements</li>
+</ul>
+<h4 id="90-day-execution-plan">90-day execution plan<a class="headerlink" href="#90-day-execution-plan" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Weeks 1-4: Reliability hardening</strong></li>
+<li>make deterministic repair + verification pass rate transparent per issue type</li>
+<li>reduce false-fix rate with stricter policy thresholds and rollback defaults</li>
+<li>ship golden-path examples that run end-to-end in CI</li>
+<li><strong>Weeks 5-8: Integration validation</strong></li>
+<li>deliver one production-ready webhook adapter and one queue adapter</li>
+<li>add deployment-system handshake for staged promotion and rollback evidence</li>
+<li>validate operational latency from event intake to release recommendation</li>
+<li><strong>Weeks 9-12: Adoption proof</strong></li>
+<li>run 2-3 design partner pilots</li>
+<li>capture baseline vs. after metrics for MTTR, manual remediation time, and rollback frequency</li>
+<li>publish a public case study and reference architecture</li>
+</ol>
+<h4 id="go-no-go-scorecard">Go / no-go scorecard<a class="headerlink" href="#go-no-go-scorecard" title="Permanent link">&para;</a></h4>
+<p>Continue investing only if these targets are met by the end of the next cycle:</p>
+<ul>
+<li>at least 2 active pilot teams running AION weekly</li>
+<li>
+<blockquote>
+<p>=30% reduction in median remediation time for supported issue classes</p>
+</blockquote>
+</li>
+<li>&lt;=5% verified false-fix rate on pilot repositories</li>
+<li>
+<blockquote>
+<p>=90% of auto-approved candidates either advance cleanly or rollback safely</p>
+</blockquote>
+</li>
+</ul>
+<p>If fewer than 2 of the 4 targets are met, pause expansion and either narrow the
+scope to a single high-performing workflow (for example, deterministic repair +
+verification) or sunset the project.</p>
 <h2 id="guiding-principle">Guiding principle<a class="headerlink" href="#guiding-principle" title="Permanent link">&para;</a></h2>
 <p>AION is intentionally conservative. Every step favors deterministic artifacts,
 auditable state, and reversible rollout decisions over opaque automation.</p>
