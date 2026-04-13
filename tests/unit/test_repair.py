@@ -99,6 +99,76 @@ def test_verifier_accepts_parameterized_sqlite_variant_without_fixture_exact_str
     assert verification.verdict == "verified_fix"
 
 
+def test_repair_pipeline_handles_multi_route_auth_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = tmp_path / "routes.py"
+    target.write_text(
+        "\n".join(
+            [
+                "from fastapi import APIRouter",
+                "",
+                "router = APIRouter()",
+                "",
+                '@router.get("/users")',
+                '@require_permissions("admin")',
+                "def list_users():",
+                '    return {"users": ["alice"]}',
+                "",
+                '@router.get("/audit")',
+                "def audit_log():",
+                '    return {"ok": True}',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    context = ContextProfile(auth_decorators=["@login_required", "@require_permissions"])
+
+    detector = IncidentDetector()
+    incidents = detector.detect(target, context)
+    artifact = PatchGenerator().generate(target, incidents, context)
+
+    assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
+    assert artifact is not None
+    assert artifact.patched_content.count("@require_permissions") == 2
+
+    verification = Verifier().verify(artifact)
+    assert verification.verdict == "verified_fix"
+
+
+def test_repair_pipeline_handles_app_route_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = tmp_path / "app_routes.py"
+    target.write_text(
+        "\n".join(
+            [
+                "from fastapi import FastAPI",
+                "",
+                "app = FastAPI()",
+                "",
+                '@app.get("/admin")',
+                "def admin_dashboard():",
+                '    return {"ok": True}',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    context = ContextProfile(auth_decorators=["@login_required"])
+
+    detector = IncidentDetector()
+    incidents = detector.detect(target, context)
+    artifact = PatchGenerator().generate(target, incidents, context)
+
+    assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
+    assert artifact is not None
+    assert "@login_required" in artifact.patched_content
+    assert "@app.get" in artifact.patched_content
+
+    verification = Verifier().verify(artifact)
+    assert verification.verdict == "verified_fix"
+
+
 def test_incident_detector_merges_semgrep_and_llm_findings_into_incidents(tmp_path: Path) -> None:
     target = tmp_path / "demo.py"
     target.write_text("print('hello')\n", encoding="utf-8")

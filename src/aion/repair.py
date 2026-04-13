@@ -195,13 +195,14 @@ class IncidentDetector:
                 )
             )
 
-        if self._has_missing_auth_issue(content, context_profile):
+        missing_auth_lines = self._missing_auth_route_lines(content, context_profile)
+        for line in missing_auth_lines:
             incidents.append(
                 self._make_supported_incident(
                     target,
                     "missing_auth_decorator",
-                    line=self._line_for(content, "@router."),
-                    evidence=["APIRouter route without project auth decorator"],
+                    line=line,
+                    evidence=["Route handler without project auth decorator"],
                     confidence=0.88,
                     source="heuristic",
                 )
@@ -303,15 +304,28 @@ class IncidentDetector:
     def _has_weak_cryptography(self, content: str) -> bool:
         return "hashlib.md5(" in content
 
-    def _has_missing_auth_issue(self, content: str, context_profile: ContextProfile) -> bool:
-        if "APIRouter" not in content or "@router." not in content:
-            return False
-        auth_markers = {decorator.lstrip("@") for decorator in context_profile.auth_decorators}
-        route_block = re.search(r"((?:@\w[^\n]*\n)+)def\s+\w+\(", content)
-        if not route_block:
-            return False
-        decorators = route_block.group(1)
-        return bool(auth_markers) and not any(marker in decorators for marker in auth_markers)
+    def _missing_auth_route_lines(self, content: str, context_profile: ContextProfile) -> list[int]:
+        auth_markers = {decorator.lstrip("@").split(".")[-1] for decorator in context_profile.auth_decorators}
+        if not auth_markers:
+            return []
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return []
+
+        missing_lines: list[int] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            decorator_names = [self._render_name(decorator) for decorator in node.decorator_list]
+            route_like = any(name in ROUTE_DECORATOR_NAMES for name in decorator_names if name)
+            if not route_like:
+                continue
+            has_auth = any(name and name.split(".")[-1] in auth_markers for name in decorator_names)
+            if has_auth or not node.decorator_list:
+                continue
+            missing_lines.append(min(getattr(decorator, "lineno", node.lineno) for decorator in node.decorator_list))
+        return sorted(set(missing_lines))
 
     def _make_supported_incident(
         self,
@@ -473,6 +487,16 @@ class IncidentDetector:
             if needle in line:
                 return index
         return 1
+
+    def _render_name(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            base = self._render_name(node.value)
+            return f"{base}.{node.attr}" if base else node.attr
+        if isinstance(node, ast.Call):
+            return self._render_name(node.func)
+        return ""
 
 
 class PatchPlanner:
@@ -697,14 +721,18 @@ class PatchGenerator:
 
     def _inject_auth_decorator(self, content: str, context_profile: ContextProfile) -> str:
         decorator = self.planner._preferred_auth_decorator(context_profile)
-        if not decorator or decorator in content:
+        if not decorator:
+            return content
+        detector = IncidentDetector()
+        insertion_lines = detector._missing_auth_route_lines(content, context_profile)
+        if not insertion_lines:
             return content
         lines = content.splitlines()
-        for index, line in enumerate(lines):
-            if line.lstrip().startswith("@router."):
-                lines.insert(index, decorator)
-                return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
-        return content
+        for line_number in sorted(insertion_lines, reverse=True):
+            route_line = lines[line_number - 1]
+            indent = route_line[: len(route_line) - len(route_line.lstrip())]
+            lines.insert(line_number - 1, f"{indent}{decorator}")
+        return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
 
     def _fix_yaml_load(self, content: str) -> str:
         def repl(match: re.Match[str]) -> str:
