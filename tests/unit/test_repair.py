@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from aion.cli import app
 from aion.knowledge_base import KnowledgeBase
-from aion.models import ContextProfile, Incident, PatchArtifact, VerificationResult
+from aion.models import ContextProfile, Finding, Incident, PatchArtifact, SemgrepFinding, VerificationResult
 from aion.orchestrator import Orchestrator, PolicyEngine
 from aion.repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 
@@ -67,6 +67,172 @@ def test_repair_pipeline_skips_safe_fixture(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert incidents == []
     assert artifact is None
+
+
+def test_verifier_accepts_parameterized_sqlite_variant_without_fixture_exact_string(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = tmp_path / "service.py"
+    target.write_text(
+        "\n".join(
+            [
+                "import sqlite3",
+                "",
+                "def load_user(user_id):",
+                "    conn = sqlite3.connect('db.sqlite3')",
+                "    cursor = conn.cursor()",
+                '    cursor.execute(f"SELECT email FROM users WHERE id = {user_id}")',
+                "    return cursor.fetchone()",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    detector = IncidentDetector()
+    artifact = PatchGenerator().generate(target, detector.detect(target, ContextProfile()), ContextProfile())
+
+    assert artifact is not None
+    verification = Verifier().verify(artifact)
+    assert verification.verdict == "verified_fix"
+
+
+def test_repair_pipeline_handles_multi_route_auth_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = tmp_path / "routes.py"
+    target.write_text(
+        "\n".join(
+            [
+                "from fastapi import APIRouter",
+                "",
+                "router = APIRouter()",
+                "",
+                '@router.get("/users")',
+                '@require_permissions("admin")',
+                "def list_users():",
+                '    return {"users": ["alice"]}',
+                "",
+                '@router.get("/audit")',
+                "def audit_log():",
+                '    return {"ok": True}',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    context = ContextProfile(auth_decorators=["@login_required", "@require_permissions"])
+
+    detector = IncidentDetector()
+    incidents = detector.detect(target, context)
+    artifact = PatchGenerator().generate(target, incidents, context)
+
+    assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
+    assert artifact is not None
+    assert artifact.patched_content.count("@require_permissions") == 2
+
+    verification = Verifier().verify(artifact)
+    assert verification.verdict == "verified_fix"
+
+
+def test_repair_pipeline_handles_app_route_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
+    target = tmp_path / "app_routes.py"
+    target.write_text(
+        "\n".join(
+            [
+                "from fastapi import FastAPI",
+                "",
+                "app = FastAPI()",
+                "",
+                '@app.get("/admin")',
+                "def admin_dashboard():",
+                '    return {"ok": True}',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    context = ContextProfile(auth_decorators=["@login_required"])
+
+    detector = IncidentDetector()
+    incidents = detector.detect(target, context)
+    artifact = PatchGenerator().generate(target, incidents, context)
+
+    assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
+    assert artifact is not None
+    assert "@login_required" in artifact.patched_content
+    assert "@app.get" in artifact.patched_content
+
+    verification = Verifier().verify(artifact)
+    assert verification.verdict == "verified_fix"
+
+
+def test_incident_detector_merges_semgrep_and_llm_findings_into_incidents(tmp_path: Path) -> None:
+    target = tmp_path / "demo.py"
+    target.write_text("print('hello')\n", encoding="utf-8")
+
+    class FakeSemgrepRunner:
+        def run(self, _target: Path) -> list[SemgrepFinding]:
+            return [
+                SemgrepFinding(
+                    check_id="python.lang.security.audit.eval-detected.eval-detected",
+                    path=str(target),
+                    line=3,
+                    severity="ERROR",
+                    message="Avoid eval",
+                )
+            ]
+
+    class FakeLLMAnalyzer:
+        def analyze(self, *_args, **_kwargs) -> list[Finding]:
+            return [
+                Finding(
+                    issue="Hardcoded secret in code",
+                    severity="critical",
+                    line=5,
+                    context_gap="Project stores secrets in environment variables.",
+                    fix="Load the value with os.getenv().",
+                )
+            ]
+
+    detector = IncidentDetector(semgrep_runner=FakeSemgrepRunner(), llm_analyzer=FakeLLMAnalyzer())
+
+    outcome = detector.analyze(
+        target,
+        ContextProfile(),
+        fallback_signals=["hardcoded secret-like assignment detected"],
+    )
+
+    assert {incident.issue_type for incident in outcome.incidents} == {"eval_injection", "hardcoded_secret"}
+    assert all(incident.source == "scan" for incident in outcome.incidents)
+    assert outcome.mode == "semgrep+llm"
+
+
+def test_incident_detector_deduplicates_supported_issue_types_across_sources(tmp_path: Path) -> None:
+    target = tmp_path / "demo.py"
+    target.write_text("result = eval(user_input)\n", encoding="utf-8")
+
+    class FakeSemgrepRunner:
+        def run(self, _target: Path) -> list[SemgrepFinding]:
+            return [
+                SemgrepFinding(
+                    check_id="python.lang.security.audit.eval-detected.eval-detected",
+                    path=str(target),
+                    line=1,
+                    severity="ERROR",
+                    message="Avoid eval",
+                )
+            ]
+
+    detector = IncidentDetector(semgrep_runner=FakeSemgrepRunner())
+
+    outcome = detector.analyze(target, ContextProfile(), fallback_signals=[])
+
+    eval_incidents = [incident for incident in outcome.incidents if incident.issue_type == "eval_injection"]
+    assert len(eval_incidents) == 1
+    assert eval_incidents[0].line == 1
 
 
 def test_orchestrator_runs_incident_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:

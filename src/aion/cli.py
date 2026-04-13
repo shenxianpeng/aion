@@ -18,7 +18,7 @@ from .drift_detector import DriftDetector
 from .evaluation import compute_repair_metrics, evaluate_repair_cases, load_fixture_cases
 from .inbox import EventInbox
 from .knowledge_base import KnowledgeBase
-from .llm_analyzer import LLMAnalyzer, LLMAnalyzerError
+from .llm_analyzer import LLMAnalyzer
 from .models import (
     ContextProfile,
     EventQueueSummary,
@@ -40,8 +40,7 @@ from .models import (
 from .orchestrator import Orchestrator
 from .repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
 from .release_manager import ReleaseManager
-from .risk_heuristics import fallback_reasons
-from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
+from .semgrep_runner import SemgrepRunner, semgrep_available
 from .webhook import WebhookEventServer
 
 app = typer.Typer(help="AION: The Self-Evolving Code Engine. Code Once, Live Forever.", no_args_is_help=True)
@@ -130,54 +129,32 @@ def scan(
         warnings=detection_warnings,
     )
 
-    runner = SemgrepRunner()
-    has_semgrep = semgrep_available()
+    runner = SemgrepRunner() if semgrep_available() else None
+    has_semgrep = runner is not None
     if not has_semgrep:
         summary.warnings.append("semgrep is not installed; falling back to LLM-only mode.")
 
     analyzer = LLMAnalyzer(api_key=api_key, model=resolved_model, provider=resolved_provider.value, verbose=verbose)
-    detector = IncidentDetector()
+    detector = IncidentDetector(semgrep_runner=runner, llm_analyzer=analyzer)
 
     for file_path in files_to_scan:
         report = ScanReport(file=normalize_path(file_path), ai_generated=True)
-        semgrep_findings = []
-        if has_semgrep:
-            try:
-                semgrep_findings = runner.run(file_path)
-            except SemgrepError as exc:
-                summary.warnings.append(f"semgrep failed for {file_path.name}: {exc}")
-        report.semgrep_findings = semgrep_findings
-
         if verbose:
             stderr_console.print(f"[bold]Estimated token cost[/bold] {file_path}: {analyzer.estimate_tokens(file_path, context_profile)}")
-            if semgrep_findings:
-                stderr_console.print("[bold]Semgrep findings[/bold]")
-                stderr_console.print_json(
-                    json.dumps([finding.model_dump() for finding in semgrep_findings], ensure_ascii=False)
-                )
-
-        try:
-            reasons = fallback_reasons(file_path, context_profile)
-            if verbose and reasons:
-                stderr_console.print(f"[bold]Fallback reasons[/bold] {file_path}: {', '.join(reasons)}")
-
-            should_run_llm = (not has_semgrep) or bool(semgrep_findings) or bool(reasons)
-            if not should_run_llm:
-                report.mode = "semgrep-only"
-                report.findings = []
-            else:
-                report.findings = analyzer.analyze(
-                    file_path,
-                    context_profile,
-                    semgrep_findings,
-                    fallback_signals=reasons,
-                    console=stderr_console,
-                )
-                report.mode = "llm-only" if not has_semgrep else "semgrep+llm"
-        except LLMAnalyzerError as exc:
-            summary.warnings.append(f"LLM analysis failed for {file_path.name}: {exc}")
-            report.mode = "semgrep-only" if has_semgrep else "skipped"
-        report.incidents = detector.detect(file_path, context_profile)
+        analysis = detector.analyze(file_path, context_profile, console=stderr_console if verbose else None)
+        for warning in analysis.warnings:
+            summary.warnings.append(f"{file_path.name}: {warning}")
+        if verbose and analysis.semgrep_findings:
+            stderr_console.print("[bold]Semgrep findings[/bold]")
+            stderr_console.print_json(
+                json.dumps([finding.model_dump() for finding in analysis.semgrep_findings], ensure_ascii=False)
+            )
+        if verbose and analysis.fallback_signals:
+            stderr_console.print(f"[bold]Fallback reasons[/bold] {file_path}: {', '.join(analysis.fallback_signals)}")
+        report.semgrep_findings = analysis.semgrep_findings
+        report.findings = analysis.llm_findings
+        report.mode = analysis.mode  # type: ignore[assignment]
+        report.incidents = analysis.incidents
 
         summary.reports.append(report)
 
@@ -197,7 +174,9 @@ def repair(
         raise typer.BadParameter("Only --plan is supported in the first autonomy release.")
 
     context_profile = _load_context_profile(target, context_file)
-    record = RepairExecutor().run(target, context_profile, verify=False)
+    root = target if target.is_dir() else target.parent
+    detector = _build_detector(root)
+    record = RepairExecutor(detector=detector).run(target, context_profile, verify=False)
     if artifact_path is not None:
         _write_record(record, artifact_path)
     if record_path is not None:
@@ -225,7 +204,8 @@ def run_incident(
     output: str = typer.Option("text", "--output", help="text or json"),
 ) -> None:
     context_profile = _load_context_profile(target, context_file)
-    result = Orchestrator().run_incident(target, context_profile)
+    root = target if target.is_dir() else target.parent
+    result = _build_orchestrator(root).run_incident(target, context_profile)
     if artifact_path and result.session.artifact is not None:
         artifact_path.write_text(result.session.model_dump_json(indent=2), encoding="utf-8")
     if record_path is not None:
@@ -601,17 +581,21 @@ def watch(
                 )
                 if auto_repair:
                     repaired = 0
-                    executor = RepairExecutor(knowledge_base=kb)
-                    for incident in report.new_incidents:
-                        file_path = Path(incident.target_file)
+                    executor = RepairExecutor(detector=_build_detector(target if target.is_dir() else target.parent), knowledge_base=kb)
+                    file_targets = sorted({incident.target_file for incident in report.new_incidents})
+                    for target_file in file_targets:
+                        file_path = Path(target_file)
                         if file_path.exists():
                             record = executor.run(file_path, context_profile, verify=True)
-                            if record.verification and record.verification.verdict == "verified_fix":
+                            applied_path = _apply_verified_repair(record)
+                            if applied_path is not None:
                                 repaired += 1
+                                stderr_console.print(f"[green]  Applied verified patch to {applied_path}.[/green]")
                     if repaired:
-                        stderr_console.print(f"[green]  Auto-repaired {repaired} incident(s).[/green]")
+                        stderr_console.print(f"[green]  Applied verified patches to {repaired} file(s).[/green]")
                         # Refresh baseline after successful repairs.
-                        baseline = detector.snapshot(target, context_profile)
+                        refreshed_context = _load_context_profile(target, context_file)
+                        baseline = detector.snapshot(target, refreshed_context)
                         detector.save_snapshot(baseline, name="watch-baseline")
                     else:
                         stderr_console.print("[yellow]  No incidents could be auto-repaired; human review required.[/yellow]")
@@ -776,6 +760,13 @@ def _auto_detect_provider() -> Provider:
     return Provider.anthropic
 
 
+def _auto_detect_provider_if_available() -> Provider | None:
+    for provider in Provider:
+        if _resolve_api_key(provider):
+            return provider
+    return None
+
+
 def _provider_from_config(config: AppConfig) -> Provider | None:
     if config.provider is None:
         return None
@@ -912,10 +903,30 @@ def _resolve_event_root(event: OrchestrationEvent) -> Path:
     return Path(event.target_file).resolve().parent
 
 
+def _build_detector(root: Path, config: AppConfig | None = None, verbose: bool = False) -> IncidentDetector:
+    config = config or load_app_config(root)
+    semgrep_runner = SemgrepRunner() if semgrep_available() else None
+
+    provider = _provider_from_config(config) or _auto_detect_provider_if_available()
+    llm_analyzer = None
+    if provider is not None:
+        api_key = _resolve_api_key(provider)
+        if api_key:
+            llm_analyzer = LLMAnalyzer(
+                api_key=api_key,
+                model=config.model or _default_model_for_provider(provider),
+                provider=provider.value,
+                verbose=verbose,
+            )
+
+    return IncidentDetector(semgrep_runner=semgrep_runner, llm_analyzer=llm_analyzer)
+
+
 def _build_orchestrator(root: Path, knowledge_base: KnowledgeBase | None = None) -> Orchestrator:
     config = load_app_config(root)
     kb = knowledge_base or KnowledgeBase(base_dir=root / ".aion" / "knowledge")
-    return Orchestrator.from_config(config, knowledge_base=kb)
+    detector = _build_detector(root, config=config)
+    return Orchestrator.from_config(config, detector=detector, knowledge_base=kb)
 
 def _accumulate_queue_summary(summary: EventQueueSummary, result: OrchestrationResult) -> None:
     if result.policy.action == "auto_repair_sandbox":
@@ -933,7 +944,8 @@ def _accumulate_queue_summary(summary: EventQueueSummary, result: OrchestrationR
             summary.rollback_count += 1
 
 def _build_repair_session(target: Path, context_profile: ContextProfile) -> RepairSession:
-    detector = IncidentDetector()
+    root = target if target.is_dir() else target.parent
+    detector = _build_detector(root)
     generator = PatchGenerator()
     incidents = detector.detect(target, context_profile)
     artifact = generator.generate(target, incidents, context_profile)
@@ -1296,6 +1308,21 @@ def _record_from_run_result(result: RunIncidentResult, context_profile: ContextP
         verification=result.verification,
         warnings=result.session.warnings,
     )
+
+
+def _apply_verified_repair(record: RepairAttemptRecord) -> Path | None:
+    artifact = record.artifact
+    verification = record.verification
+    if artifact is None or verification is None:
+        return None
+    if verification.verdict != "verified_fix":
+        return None
+
+    target_path = Path(record.target)
+    temp_path = target_path.with_name(f".{target_path.name}.aion.tmp")
+    temp_path.write_text(artifact.patched_content, encoding="utf-8")
+    temp_path.replace(target_path)
+    return target_path
 
 
 def _write_record(record: RepairAttemptRecord, destination: Path) -> None:

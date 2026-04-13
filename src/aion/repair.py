@@ -5,177 +5,266 @@ import difflib
 import hashlib
 import re
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import (
     ContextProfile,
+    Finding,
     Incident,
     PatchArtifact,
     RepairAttemptRecord,
     RemediationPlan,
+    SemgrepFinding,
     VerificationCheck,
     VerificationResult,
     normalize_path,
 )
+from .risk_heuristics import ROUTE_DECORATOR_NAMES, fallback_reasons
 from .semgrep_runner import SemgrepError, SemgrepRunner, semgrep_available
 
 
+@dataclass
+class DetectionOutcome:
+    incidents: list[Incident]
+    semgrep_findings: list[SemgrepFinding]
+    llm_findings: list[Finding]
+    fallback_signals: list[str]
+    warnings: list[str]
+    mode: str
+
+
 class IncidentDetector:
-    def detect(self, target: Path, context_profile: ContextProfile) -> list[Incident]:
+    _SUPPORTED_INCIDENTS: dict[str, dict[str, object]] = {
+        "raw_sqlite_query": {
+            "issue": "Raw sqlite query bypasses project database safety patterns.",
+            "severity": "high",
+            "attack_surface": "database",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "parameterize_sqlite_query",
+            "verification_strategy": ["syntax", "semgrep", "sqlite_parameterization"],
+        },
+        "hardcoded_secret": {
+            "issue": "Hardcoded secret should be loaded from environment variables.",
+            "severity": "critical",
+            "attack_surface": "credential",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "env_secret",
+            "verification_strategy": ["syntax", "secret_removed", "semgrep"],
+        },
+        "missing_auth_decorator": {
+            "issue": "Route handler bypasses the repository's auth decorator pattern.",
+            "severity": "high",
+            "attack_surface": "http",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "inject_auth_decorator",
+            "verification_strategy": ["syntax", "auth_decorator_present"],
+        },
+        "insecure_yaml_load": {
+            "issue": "yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
+            "severity": "critical",
+            "attack_surface": "deserialization",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "safe_yaml_load",
+            "verification_strategy": ["syntax", "yaml_safe_load", "semgrep"],
+        },
+        "command_injection": {
+            "issue": "os.system with an f-string argument is vulnerable to shell command injection.",
+            "severity": "critical",
+            "attack_surface": "command_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "shlex_quote_command",
+            "verification_strategy": ["syntax", "command_shlex_quoted"],
+        },
+        "eval_injection": {
+            "issue": "eval() with user-controlled input enables arbitrary code execution.",
+            "severity": "critical",
+            "attack_surface": "code_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "ast_literal_eval",
+            "verification_strategy": ["syntax", "eval_replaced"],
+        },
+        "subprocess_shell_injection": {
+            "issue": "subprocess called with shell=True and an f-string is vulnerable to command injection.",
+            "severity": "critical",
+            "attack_surface": "command_execution",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "shlex_quote_subprocess",
+            "verification_strategy": ["syntax", "subprocess_shlex_quoted"],
+        },
+        "weak_cryptography": {
+            "issue": "MD5 is a broken hash algorithm; use SHA-256 or stronger for security-sensitive operations.",
+            "severity": "high",
+            "attack_surface": "cryptography",
+            "recommended_action": "auto_repair",
+            "remediation_strategy": "upgrade_hash_algorithm",
+            "verification_strategy": ["syntax", "weak_hash_removed"],
+        },
+    }
+
+    def __init__(
+        self,
+        semgrep_runner: SemgrepRunner | None = None,
+        llm_analyzer=None,
+    ) -> None:
+        self.semgrep_runner = semgrep_runner
+        self.llm_analyzer = llm_analyzer
+
+    def analyze(
+        self,
+        target: Path,
+        context_profile: ContextProfile,
+        fallback_signals: list[str] | None = None,
+        console=None,
+    ) -> DetectionOutcome:
         content = target.read_text(encoding="utf-8", errors="ignore")
+        signals = fallback_signals if fallback_signals is not None else fallback_reasons(target, context_profile)
+        warnings: list[str] = []
+        semgrep_findings: list[SemgrepFinding] = []
+        llm_findings: list[Finding] = []
+        mode = "heuristic-only"
+
+        if self.semgrep_runner is not None:
+            try:
+                semgrep_findings = self.semgrep_runner.run(target)
+                mode = "semgrep-only"
+            except SemgrepError as exc:
+                warnings.append(f"semgrep failed: {exc}")
+
+        should_run_llm = self.llm_analyzer is not None and ((self.semgrep_runner is None) or bool(semgrep_findings) or bool(signals))
+        if should_run_llm:
+            try:
+                llm_findings = self.llm_analyzer.analyze(
+                    target,
+                    context_profile,
+                    semgrep_findings,
+                    fallback_signals=signals,
+                    console=console,
+                )
+                mode = "llm-only" if self.semgrep_runner is None else "semgrep+llm"
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"LLM analysis failed: {exc}")
+                if self.semgrep_runner is None:
+                    mode = "heuristic-only"
+
+        incidents = self._deduplicate_incidents(
+            [
+                *self._detect_heuristics(target, content, context_profile),
+                *self._incidents_from_semgrep(target, semgrep_findings),
+                *self._incidents_from_llm(target, llm_findings),
+            ]
+        )
+        return DetectionOutcome(
+            incidents=incidents,
+            semgrep_findings=semgrep_findings,
+            llm_findings=llm_findings,
+            fallback_signals=signals,
+            warnings=warnings,
+            mode=mode,
+        )
+
+    def detect(self, target: Path, context_profile: ContextProfile) -> list[Incident]:
+        return self.analyze(target, context_profile).incidents
+
+    def _detect_heuristics(self, target: Path, content: str, context_profile: ContextProfile) -> list[Incident]:
         incidents: list[Incident] = []
 
         if self._has_raw_sqlite_issue(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "raw_sqlite_query"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="raw_sqlite_query",
-                    issue="Raw sqlite query bypasses project database safety patterns.",
-                    severity="high",
+                self._make_supported_incident(
+                    target,
+                    "raw_sqlite_query",
                     line=self._line_for(content, "cursor.execute"),
                     evidence=["sqlite3.connect", "cursor.execute(f-string)"],
                     confidence=0.93,
-                    attack_surface="database",
-                    recommended_action="auto_repair",
-                    remediation_strategy="parameterize_sqlite_query",
-                    verification_strategy=["syntax", "semgrep", "sqlite_parameterization"],
+                    source="heuristic",
                 )
             )
 
         secret_match = self._find_hardcoded_secret(content)
         if secret_match:
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "hardcoded_secret"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="hardcoded_secret",
-                    issue="Hardcoded secret should be loaded from environment variables.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "hardcoded_secret",
                     line=self._line_for(content, secret_match.group(0)),
                     evidence=[secret_match.group(0).strip()],
                     confidence=0.98,
-                    attack_surface="credential",
-                    recommended_action="auto_repair",
-                    remediation_strategy="env_secret",
-                    verification_strategy=["syntax", "secret_removed", "semgrep"],
+                    source="heuristic",
                 )
             )
 
-        if self._has_missing_auth_issue(content, context_profile):
+        missing_auth_lines = self._missing_auth_route_lines(content, context_profile)
+        for line in missing_auth_lines:
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "missing_auth_decorator"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="missing_auth_decorator",
-                    issue="Route handler bypasses the repository's auth decorator pattern.",
-                    severity="high",
-                    line=self._line_for(content, "@router."),
-                    evidence=["APIRouter route without project auth decorator"],
+                self._make_supported_incident(
+                    target,
+                    "missing_auth_decorator",
+                    line=line,
+                    evidence=["Route handler without project auth decorator"],
                     confidence=0.88,
-                    attack_surface="http",
-                    recommended_action="auto_repair",
-                    remediation_strategy="inject_auth_decorator",
-                    verification_strategy=["syntax", "auth_decorator_present"],
+                    source="heuristic",
                 )
             )
 
         if self._has_insecure_yaml_load(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "insecure_yaml_load"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="insecure_yaml_load",
-                    issue="yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "insecure_yaml_load",
                     line=self._line_for(content, "yaml.load("),
                     evidence=["yaml.load called without SafeLoader"],
                     confidence=0.97,
-                    attack_surface="deserialization",
-                    recommended_action="auto_repair",
-                    remediation_strategy="safe_yaml_load",
-                    verification_strategy=["syntax", "yaml_safe_load", "semgrep"],
+                    source="heuristic",
                 )
             )
 
         if self._has_command_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "command_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="command_injection",
-                    issue="os.system with an f-string argument is vulnerable to shell command injection.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "command_injection",
                     line=self._line_for(content, "os.system("),
                     evidence=["os.system(f-string)"],
                     confidence=0.95,
-                    attack_surface="command_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="shlex_quote_command",
-                    verification_strategy=["syntax", "command_shlex_quoted"],
+                    source="heuristic",
                 )
             )
 
         if self._has_eval_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "eval_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="eval_injection",
-                    issue="eval() with user-controlled input enables arbitrary code execution.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "eval_injection",
                     line=self._line_for(content, "eval("),
                     evidence=["eval() called with non-constant argument"],
                     confidence=0.96,
-                    attack_surface="code_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="ast_literal_eval",
-                    verification_strategy=["syntax", "eval_replaced"],
+                    source="heuristic",
                 )
             )
 
         if self._has_subprocess_shell_injection(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "subprocess_shell_injection"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="subprocess_shell_injection",
-                    issue="subprocess called with shell=True and an f-string is vulnerable to command injection.",
-                    severity="critical",
+                self._make_supported_incident(
+                    target,
+                    "subprocess_shell_injection",
                     line=self._line_for(content, "subprocess."),
                     evidence=["subprocess with shell=True and f-string argument"],
                     confidence=0.95,
-                    attack_surface="command_execution",
-                    recommended_action="auto_repair",
-                    remediation_strategy="shlex_quote_subprocess",
-                    verification_strategy=["syntax", "subprocess_shlex_quoted"],
+                    source="heuristic",
                 )
             )
 
         if self._has_weak_cryptography(content):
             incidents.append(
-                Incident(
-                    id=self._incident_id(target, "weak_cryptography"),
-                    source="heuristic",
-                    target_file=normalize_path(target),
-                    issue_type="weak_cryptography",
-                    issue="MD5 is a broken hash algorithm; use SHA-256 or stronger for security-sensitive operations.",
-                    severity="high",
+                self._make_supported_incident(
+                    target,
+                    "weak_cryptography",
                     line=self._line_for(content, "hashlib.md5("),
                     evidence=["hashlib.md5 used for security-sensitive hashing"],
                     confidence=0.92,
-                    attack_surface="cryptography",
-                    recommended_action="auto_repair",
-                    remediation_strategy="upgrade_hash_algorithm",
-                    verification_strategy=["syntax", "weak_hash_removed"],
+                    source="heuristic",
                 )
             )
 
@@ -215,18 +304,182 @@ class IncidentDetector:
     def _has_weak_cryptography(self, content: str) -> bool:
         return "hashlib.md5(" in content
 
-    def _has_missing_auth_issue(self, content: str, context_profile: ContextProfile) -> bool:
-        if "APIRouter" not in content or "@router." not in content:
-            return False
-        auth_markers = {decorator.lstrip("@") for decorator in context_profile.auth_decorators}
-        route_block = re.search(r"((?:@\w[^\n]*\n)+)def\s+\w+\(", content)
-        if not route_block:
-            return False
-        decorators = route_block.group(1)
-        return bool(auth_markers) and not any(marker in decorators for marker in auth_markers)
+    def _missing_auth_route_lines(self, content: str, context_profile: ContextProfile) -> list[int]:
+        auth_markers = {decorator.lstrip("@").split(".")[-1] for decorator in context_profile.auth_decorators}
+        if not auth_markers:
+            return []
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return []
 
-    def _incident_id(self, target: Path, issue_type: str) -> str:
-        digest = hashlib.sha256(f"{normalize_path(target)}:{issue_type}".encode("utf-8")).hexdigest()
+        missing_lines: list[int] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            decorator_names = [self._render_name(decorator) for decorator in node.decorator_list]
+            route_like = any(name in ROUTE_DECORATOR_NAMES for name in decorator_names if name)
+            if not route_like:
+                continue
+            has_auth = any(name and name.split(".")[-1] in auth_markers for name in decorator_names)
+            if has_auth or not node.decorator_list:
+                continue
+            missing_lines.append(min(getattr(decorator, "lineno", node.lineno) for decorator in node.decorator_list))
+        return sorted(set(missing_lines))
+
+    def _make_supported_incident(
+        self,
+        target: Path,
+        issue_type: str,
+        *,
+        line: int,
+        evidence: list[str],
+        confidence: float,
+        source: str,
+    ) -> Incident:
+        metadata = self._SUPPORTED_INCIDENTS[issue_type]
+        return Incident(
+            id=self._incident_id(target, issue_type, line),
+            source=source,  # type: ignore[arg-type]
+            target_file=normalize_path(target),
+            issue_type=issue_type,
+            issue=str(metadata["issue"]),
+            severity=metadata["severity"],  # type: ignore[arg-type]
+            line=line,
+            evidence=evidence,
+            confidence=confidence,
+            attack_surface=str(metadata["attack_surface"]),
+            recommended_action=str(metadata["recommended_action"]),
+            remediation_strategy=str(metadata["remediation_strategy"]),
+            verification_strategy=list(metadata["verification_strategy"]),
+        )
+
+    def _incidents_from_semgrep(self, target: Path, findings: list[SemgrepFinding]) -> list[Incident]:
+        incidents: list[Incident] = []
+        for finding in findings:
+            issue_type = self._infer_issue_type(" ".join(filter(None, [finding.check_id, finding.message, finding.code or ""])))
+            if issue_type is None:
+                incidents.append(
+                    self._make_review_incident(
+                        target,
+                        issue_type="semgrep_review",
+                        line=finding.line,
+                        issue=finding.message or finding.check_id,
+                        severity=self._severity_from_semgrep(finding.severity),
+                        evidence=[finding.check_id, finding.message],
+                        confidence=0.70,
+                    )
+                )
+                continue
+            incidents.append(
+                self._make_supported_incident(
+                    target,
+                    issue_type,
+                    line=finding.line,
+                    evidence=[finding.check_id, finding.message],
+                    confidence=0.90,
+                    source="scan",
+                )
+            )
+        return incidents
+
+    def _incidents_from_llm(self, target: Path, findings: list[Finding]) -> list[Incident]:
+        incidents: list[Incident] = []
+        for finding in findings:
+            issue_type = self._infer_issue_type(" ".join([finding.issue, finding.context_gap, finding.fix]))
+            if issue_type is None:
+                incidents.append(
+                    self._make_review_incident(
+                        target,
+                        issue_type="llm_review",
+                        line=finding.line,
+                        issue=finding.issue,
+                        severity=finding.severity,
+                        evidence=[finding.context_gap, finding.fix],
+                        confidence=0.75,
+                    )
+                )
+                continue
+            incidents.append(
+                self._make_supported_incident(
+                    target,
+                    issue_type,
+                    line=finding.line,
+                    evidence=[finding.issue, finding.context_gap, finding.fix],
+                    confidence=0.85,
+                    source="scan",
+                )
+            )
+        return incidents
+
+    def _make_review_incident(
+        self,
+        target: Path,
+        *,
+        issue_type: str,
+        line: int,
+        issue: str,
+        severity,
+        evidence: list[str],
+        confidence: float,
+    ) -> Incident:
+        return Incident(
+            id=self._incident_id(target, issue_type, line),
+            source="scan",
+            target_file=normalize_path(target),
+            issue_type=issue_type,
+            issue=issue,
+            severity=severity,
+            line=line,
+            evidence=evidence,
+            confidence=confidence,
+            recommended_action="review",
+        )
+
+    def _infer_issue_type(self, text: str) -> str | None:
+        lowered = text.lower()
+        if "sqlite" in lowered and ("cursor.execute" in lowered or "sql injection" in lowered or "parameterized" in lowered):
+            return "raw_sqlite_query"
+        if "secret" in lowered or "api key" in lowered or "password" in lowered or "token" in lowered:
+            return "hardcoded_secret"
+        if "auth decorator" in lowered or "authentication decorator" in lowered or "missing auth" in lowered:
+            return "missing_auth_decorator"
+        if "yaml.load" in lowered or ("yaml" in lowered and "safe" in lowered):
+            return "insecure_yaml_load"
+        if "subprocess" in lowered and ("shell=true" in lowered or "command injection" in lowered):
+            return "subprocess_shell_injection"
+        if "os.system" in lowered or ("command injection" in lowered and "subprocess" not in lowered):
+            return "command_injection"
+        if "eval" in lowered:
+            return "eval_injection"
+        if "md5" in lowered or "hashlib.md5" in lowered or "sha-256" in lowered or "sha256" in lowered:
+            return "weak_cryptography"
+        return None
+
+    def _severity_from_semgrep(self, severity: str):
+        mapping = {
+            "ERROR": "high",
+            "WARNING": "medium",
+            "INFO": "low",
+        }
+        return mapping.get(severity.upper(), "medium")
+
+    def _deduplicate_incidents(self, incidents: list[Incident]) -> list[Incident]:
+        deduped: dict[tuple[str, str, int, str | None], Incident] = {}
+        for incident in incidents:
+            key = (
+                incident.target_file,
+                incident.issue_type,
+                incident.line,
+                incident.remediation_strategy,
+            )
+            existing = deduped.get(key)
+            if existing is None or incident.confidence > existing.confidence:
+                deduped[key] = incident
+        return sorted(deduped.values(), key=lambda incident: (incident.target_file, incident.line, incident.issue_type))
+
+    def _incident_id(self, target: Path, issue_type: str, line: int) -> str:
+        digest = hashlib.sha256(f"{normalize_path(target)}:{issue_type}:{line}".encode("utf-8")).hexdigest()
         return digest[:12]
 
     def _line_for(self, content: str, needle: str) -> int:
@@ -234,6 +487,16 @@ class IncidentDetector:
             if needle in line:
                 return index
         return 1
+
+    def _render_name(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            base = self._render_name(node.value)
+            return f"{base}.{node.attr}" if base else node.attr
+        if isinstance(node, ast.Call):
+            return self._render_name(node.func)
+        return ""
 
 
 class PatchPlanner:
@@ -458,14 +721,18 @@ class PatchGenerator:
 
     def _inject_auth_decorator(self, content: str, context_profile: ContextProfile) -> str:
         decorator = self.planner._preferred_auth_decorator(context_profile)
-        if not decorator or decorator in content:
+        if not decorator:
+            return content
+        detector = IncidentDetector()
+        insertion_lines = detector._missing_auth_route_lines(content, context_profile)
+        if not insertion_lines:
             return content
         lines = content.splitlines()
-        for index, line in enumerate(lines):
-            if line.lstrip().startswith("@router."):
-                lines.insert(index, decorator)
-                return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
-        return content
+        for line_number in sorted(insertion_lines, reverse=True):
+            route_line = lines[line_number - 1]
+            indent = route_line[: len(route_line) - len(route_line.lstrip())]
+            lines.insert(line_number - 1, f"{indent}{decorator}")
+        return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
 
     def _fix_yaml_load(self, content: str) -> str:
         def repl(match: re.Match[str]) -> str:
@@ -627,11 +894,14 @@ class Verifier:
     def _run_assertions(self, artifact: PatchArtifact) -> tuple[bool, dict[str, list[object]]]:
         checks: list[VerificationCheck] = []
         reasons: list[str] = []
-        patched = artifact.patched_content
+        try:
+            tree = ast.parse(artifact.patched_content)
+        except SyntaxError:
+            return False, {"checks": checks, "reasons": reasons}
 
         for plan in artifact.plans:
             if plan.strategy == "parameterize_sqlite_query":
-                passed = 'cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))' in patched
+                passed = self._has_parameterized_sqlite_query(tree)
                 checks.append(
                     VerificationCheck(
                         name="sqlite_parameterization",
@@ -642,7 +912,7 @@ class Verifier:
                 if not passed:
                     reasons.append("Patched sqlite query is not parameterized.")
             elif plan.strategy == "env_secret":
-                passed = "os.getenv(" in patched and "sk-live-" not in patched
+                passed = self._uses_env_lookup_for_secret(tree)
                 checks.append(
                     VerificationCheck(
                         name="secret_removed",
@@ -654,7 +924,7 @@ class Verifier:
                     reasons.append("Hardcoded secret literal still exists after patching.")
             elif plan.strategy == "inject_auth_decorator":
                 details = plan.summary.replace("Insert the repository auth decorator ", "").rstrip(".")
-                passed = details in patched
+                passed = self._all_route_handlers_have_auth_decorator(tree, details)
                 checks.append(
                     VerificationCheck(
                         name="auth_decorator_present",
@@ -665,11 +935,7 @@ class Verifier:
                 if not passed:
                     reasons.append("Auth decorator was not injected into the route declaration.")
             elif plan.strategy == "safe_yaml_load":
-                remaining_unsafe = any(
-                    "Loader" not in m.group(0)
-                    for m in re.finditer(r"\byaml\.load\s*\([^)]*\)", patched)
-                )
-                passed = "yaml.safe_load(" in patched and not remaining_unsafe
+                passed = self._uses_safe_yaml_loader(tree)
                 checks.append(
                     VerificationCheck(
                         name="yaml_safe_load",
@@ -680,7 +946,7 @@ class Verifier:
                 if not passed:
                     reasons.append("Insecure yaml.load still present after patching.")
             elif plan.strategy == "shlex_quote_command":
-                passed = "shlex.quote(" in patched
+                passed = self._uses_shlex_quote_for_os_system(tree)
                 checks.append(
                     VerificationCheck(
                         name="command_shlex_quoted",
@@ -691,7 +957,7 @@ class Verifier:
                 if not passed:
                     reasons.append("os.system call is not protected with shlex.quote.")
             elif plan.strategy == "ast_literal_eval":
-                passed = "ast.literal_eval(" in patched and "import ast" in patched
+                passed = self._replaces_eval_with_literal_eval(tree)
                 checks.append(
                     VerificationCheck(
                         name="eval_replaced",
@@ -702,7 +968,7 @@ class Verifier:
                 if not passed:
                     reasons.append("eval() was not replaced with ast.literal_eval().")
             elif plan.strategy == "shlex_quote_subprocess":
-                passed = "shlex.quote(" in patched
+                passed = self._uses_shlex_quote_for_subprocess(tree)
                 checks.append(
                     VerificationCheck(
                         name="subprocess_shlex_quoted",
@@ -713,7 +979,7 @@ class Verifier:
                 if not passed:
                     reasons.append("subprocess call is not protected with shlex.quote.")
             elif plan.strategy == "upgrade_hash_algorithm":
-                passed = "hashlib.sha256(" in patched and "hashlib.md5(" not in patched
+                passed = self._upgrades_weak_hash_algorithm(tree)
                 checks.append(
                     VerificationCheck(
                         name="weak_hash_removed",
@@ -725,6 +991,168 @@ class Verifier:
                     reasons.append("Weak hash algorithm hashlib.md5 still present after patching.")
 
         return not reasons, {"checks": checks, "reasons": reasons}
+
+    def _has_parameterized_sqlite_query(self, tree: ast.AST) -> bool:
+        execute_calls = [call for call in self._iter_calls(tree, "cursor.execute")]
+        if not execute_calls:
+            return False
+        has_safe_call = False
+        for call in execute_calls:
+            if not call.args:
+                continue
+            query_arg = call.args[0]
+            if isinstance(query_arg, ast.JoinedStr):
+                return False
+            if len(call.args) < 2:
+                continue
+            if self._is_placeholder_query(query_arg):
+                has_safe_call = True
+        return has_safe_call
+
+    def _uses_env_lookup_for_secret(self, tree: ast.AST) -> bool:
+        assignments = list(self._iter_secret_assignments(tree))
+        if not assignments:
+            return False
+        return all(self._is_env_lookup(value) for _, value in assignments)
+
+    def _all_route_handlers_have_auth_decorator(self, tree: ast.AST, decorator_name: str) -> bool:
+        expected = decorator_name.lstrip("@").split(".")[-1]
+        route_handlers = []
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            decorator_names = [self._render_name(decorator) for decorator in node.decorator_list]
+            if any(name in ROUTE_DECORATOR_NAMES for name in decorator_names if name):
+                route_handlers.append(decorator_names)
+        if not route_handlers:
+            return False
+        return all(any(name.split(".")[-1] == expected for name in names if name) for names in route_handlers)
+
+    def _uses_safe_yaml_loader(self, tree: ast.AST) -> bool:
+        saw_safe_load = False
+        for call in self._iter_calls(tree):
+            name = self._render_name(call.func)
+            if name == "yaml.safe_load":
+                saw_safe_load = True
+            if name == "yaml.load":
+                loader_kwarg = any(kw.arg == "Loader" for kw in call.keywords)
+                if not loader_kwarg:
+                    return False
+        return saw_safe_load
+
+    def _uses_shlex_quote_for_os_system(self, tree: ast.AST) -> bool:
+        os_calls = [call for call in self._iter_calls(tree, "os.system")]
+        if not os_calls:
+            return False
+        saw_quoted = False
+        for call in os_calls:
+            if not call.args:
+                continue
+            arg = call.args[0]
+            if isinstance(arg, ast.JoinedStr):
+                if not self._joined_str_values_are_quoted(arg):
+                    return False
+                saw_quoted = True
+        return saw_quoted
+
+    def _replaces_eval_with_literal_eval(self, tree: ast.AST) -> bool:
+        saw_literal_eval = False
+        for call in self._iter_calls(tree):
+            name = self._render_name(call.func)
+            if name == "eval":
+                return False
+            if name == "ast.literal_eval":
+                saw_literal_eval = True
+        return saw_literal_eval
+
+    def _uses_shlex_quote_for_subprocess(self, tree: ast.AST) -> bool:
+        subprocess_names = {"subprocess.call", "subprocess.run", "subprocess.Popen"}
+        saw_quoted = False
+        for call in self._iter_calls(tree):
+            name = self._render_name(call.func)
+            if name not in subprocess_names:
+                continue
+            has_shell_true = any(
+                kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True
+                for kw in call.keywords
+            )
+            if not has_shell_true or not call.args:
+                continue
+            arg = call.args[0]
+            if isinstance(arg, ast.JoinedStr):
+                if not self._joined_str_values_are_quoted(arg):
+                    return False
+                saw_quoted = True
+        return saw_quoted
+
+    def _upgrades_weak_hash_algorithm(self, tree: ast.AST) -> bool:
+        saw_sha256 = False
+        for call in self._iter_calls(tree):
+            name = self._render_name(call.func)
+            if name == "hashlib.md5":
+                return False
+            if name == "hashlib.sha256":
+                saw_sha256 = True
+        return saw_sha256
+
+    def _iter_calls(self, tree: ast.AST, name: str | None = None) -> list[ast.Call]:
+        calls: list[ast.Call] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if name is None or self._render_name(node.func) == name:
+                calls.append(node)
+        return calls
+
+    def _iter_secret_assignments(self, tree: ast.AST) -> list[tuple[str, ast.AST]]:
+        assignments: list[tuple[str, ast.AST]] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    name = self._render_name(target)
+                    if self._is_secret_name(name):
+                        assignments.append((name, node.value))
+            elif isinstance(node, ast.AnnAssign):
+                name = self._render_name(node.target)
+                if node.value is not None and self._is_secret_name(name):
+                    assignments.append((name, node.value))
+        return assignments
+
+    def _is_secret_name(self, name: str) -> bool:
+        markers = ("secret", "token", "api_key", "password")
+        lowered = name.lower()
+        return any(marker in lowered for marker in markers)
+
+    def _is_env_lookup(self, value: ast.AST) -> bool:
+        if not isinstance(value, ast.Call):
+            return False
+        name = self._render_name(value.func)
+        return name in {"os.getenv", "os.environ.get"}
+
+    def _is_placeholder_query(self, value: ast.AST) -> bool:
+        return isinstance(value, ast.Constant) and isinstance(value.value, str) and "?" in value.value
+
+    def _joined_str_values_are_quoted(self, joined: ast.JoinedStr) -> bool:
+        saw_formatted = False
+        for value in joined.values:
+            if not isinstance(value, ast.FormattedValue):
+                continue
+            saw_formatted = True
+            if not isinstance(value.value, ast.Call):
+                return False
+            if self._render_name(value.value.func) != "shlex.quote":
+                return False
+        return saw_formatted
+
+    def _render_name(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            base = self._render_name(node.value)
+            return f"{base}.{node.attr}" if base else node.attr
+        if isinstance(node, ast.Call):
+            return self._render_name(node.func)
+        return ""
 
 
 class RepairExecutor:

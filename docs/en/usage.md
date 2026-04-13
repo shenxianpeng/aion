@@ -229,7 +229,9 @@ uv run aion watch ./src --interval 30 --auto-repair
 
 AION polls every `--interval` seconds, compares against the last known-good
 baseline, and automatically generates and verifies patches for any new incidents.
-Each successful repair is recorded in the knowledge base so future runs improve.
+When a repair reaches `verified_fix`, `watch` writes the patched content back to
+the watched local file and refreshes the baseline. Each successful repair is
+recorded in the knowledge base so future runs improve.
 
 ### Inspect engine health and learned patterns
 
@@ -243,7 +245,7 @@ uv run aion status --aion-dir ./.aion --output json
 
 ## Operational notes
 
-- The current release emits patch artifacts; it does not rewrite live production files in place.
+- The current release emits patch artifacts and `watch` can rewrite watched local files after verification; it does not rewrite live production files in place.
 - `sandbox_verification_commands` run inside the staged workspace, not inside your working tree.
 - `process-event` and inbox processing automatically load `.aion.yaml` from the event repository root.
 - `repair-eval` reports repair success rate, verification pass rate, false-fix rate, and rollback rate.

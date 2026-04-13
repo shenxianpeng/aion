@@ -227,7 +227,9 @@ uv run aion watch ./src --interval 30 --auto-repair
 ```
 
 AION 每隔 `--interval` 秒轮询一次，将当前状态与上一个已知好的基线对比，
-并自动生成和验证新事件的修复补丁。每次成功修复都会记录到知识库，使后续修复持续改进。
+并自动生成和验证新事件的修复补丁。当修复达到 `verified_fix` 时，
+`watch` 会把补丁内容写回被监控的本地文件，并刷新基线。每次成功修复都会记录到知识库，
+使后续修复持续改进。
 
 ### 查看引擎健康状态和已学习的修复模式
 
@@ -241,7 +243,7 @@ uv run aion status --aion-dir ./.aion --output json
 
 ## 运行说明
 
-- 当前版本生成的是 patch artifact，不会直接原地改写生产文件。
+- 当前版本会生成 patch artifact；`watch` 仅会在验证通过后改写被监控的本地文件，不会直接原地改写生产环境文件。
 - `sandbox_verification_commands` 只会在 staged workspace 中执行，不会在你的工作树里直接运行。
 - `process-event` 和 inbox 处理会自动从事件仓库根目录加载 `.aion.yaml`。
 - `repair-eval` 会输出修复成功率、验证通过率、误修率和回滚率。
