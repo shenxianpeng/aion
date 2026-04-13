@@ -73,6 +73,46 @@ The next major work is no longer core modeling. It is integration:
 - approval and audit integration with external systems
 - richer repository test selection instead of only configured command lists
 
+### Phase 6: Product proof before scale
+
+Before adding more adapters, AION should prove it can reliably reduce security
+and operations toil for at least one clear ideal customer profile (ICP). The
+priority is measurable product impact, not feature count.
+
+#### ICP for the next cycle
+
+- Python platform teams maintaining 10-50 services
+- Existing Semgrep and CI usage, but no standardized automated remediation
+- Need for auditable, approval-based rollout due to compliance requirements
+
+#### 90-day execution plan
+
+1. **Weeks 1-4: Reliability hardening**
+   - make deterministic repair + verification pass rate transparent per issue type
+   - reduce false-fix rate with stricter policy thresholds and rollback defaults
+   - ship golden-path examples that run end-to-end in CI
+2. **Weeks 5-8: Integration validation**
+   - deliver one production-ready webhook adapter and one queue adapter
+   - add deployment-system handshake for staged promotion and rollback evidence
+   - validate operational latency from event intake to release recommendation
+3. **Weeks 9-12: Adoption proof**
+   - run 2-3 design partner pilots
+   - capture baseline vs. after metrics for MTTR, manual remediation time, and rollback frequency
+   - publish a public case study and reference architecture
+
+#### Go / no-go scorecard
+
+Continue investing only if these targets are met by the end of the next cycle:
+
+- at least 2 active pilot teams running AION weekly
+- >=30% reduction in median remediation time for supported issue classes
+- <=5% verified false-fix rate on pilot repositories
+- >=90% of auto-approved candidates either advance cleanly or rollback safely
+
+If fewer than 2 of the 4 targets are met, pause expansion and either narrow the
+scope to a single high-performing workflow (for example, deterministic repair +
+verification) or sunset the project.
+
 ## Guiding principle
 
 AION is intentionally conservative. Every step favors deterministic artifacts,
