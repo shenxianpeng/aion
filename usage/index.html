@@ -1116,7 +1116,9 @@ Use <code>--output json</code> to get a machine-readable drift report for CI int
 </code></pre></div>
 <p>AION polls every <code>--interval</code> seconds, compares against the last known-good
 baseline, and automatically generates and verifies patches for any new incidents.
-Each successful repair is recorded in the knowledge base so future runs improve.</p>
+When a repair reaches <code>verified_fix</code>, <code>watch</code> writes the patched content back to
+the watched local file and refreshes the baseline. Each successful repair is
+recorded in the knowledge base so future runs improve.</p>
 <h3 id="inspect-engine-health-and-learned-patterns">Inspect engine health and learned patterns<a class="headerlink" href="#inspect-engine-health-and-learned-patterns" title="Permanent link">&para;</a></h3>
 <p>Show accumulated snapshots and knowledge-base repair patterns:</p>
 <div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>status
@@ -1125,7 +1127,7 @@ Each successful repair is recorded in the knowledge base so future runs improve.
 </code></pre></div>
 <h2 id="operational-notes">Operational notes<a class="headerlink" href="#operational-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li>The current release emits patch artifacts; it does not rewrite live production files in place.</li>
+<li>The current release emits patch artifacts and <code>watch</code> can rewrite watched local files after verification; it does not rewrite live production files in place.</li>
 <li><code>sandbox_verification_commands</code> run inside the staged workspace, not inside your working tree.</li>
 <li><code>process-event</code> and inbox processing automatically load <code>.aion.yaml</code> from the event repository root.</li>
 <li><code>repair-eval</code> reports repair success rate, verification pass rate, false-fix rate, and rollback rate.</li>
