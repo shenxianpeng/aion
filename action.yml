@@ -1,0 +1,60 @@
+name: AION Auto-Update
+description: 'AION: The Self-Evolving Code Engine — scan, fix, and auto-PR like Dependabot'
+author: shenxianpeng
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  target:
+    description: 'Repository root to scan and fix'
+    required: false
+    default: '.'
+  dry_run:
+    description: 'Scan and report but do not create PRs'
+    required: false
+    default: 'false'
+  openai_api_key:
+    description: 'OpenAI API key (optional, for LLM-assisted scanning)'
+    required: false
+  anthropic_api_key:
+    description: 'Anthropic API key (optional, for LLM-assisted scanning)'
+    required: false
+  gemini_api_key:
+    description: 'Google Gemini API key (optional, for LLM-assisted scanning)'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      shell: bash
+      run: python -m pip install uv
+
+    - name: Install AION
+      shell: bash
+      run: |
+        uv tool install aion-evolve || pip install aion-evolve
+
+    - name: Configure git
+      shell: bash
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Run AION Auto-Update
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        aion auto-update \
+          --target "${{ inputs.target }}" \
+          ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}

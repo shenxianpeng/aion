@@ -194,7 +194,63 @@ The current defense planner can emit:
 - dependency pin recommendations
 - code-patch follow-up actions
 
-## 7. Track security drift and evolution
+## 7. Auto-Update (Dependabot-style)
+
+Run the full scan → fix → PR pipeline:
+
+```bash
+uv run aion auto-update --target ./
+```
+
+Dry-run to inspect what would happen without creating PRs:
+
+```bash
+uv run aion auto-update --target ./ --dry-run
+```
+
+The `auto-update` command:
+
+1. Reads `.aion.yaml` for scheduling, policy, and PR configuration
+2. Scans all Python files for security incidents
+3. Generates deterministic patches for supported issue types
+4. Verifies each patch in an isolated workspace
+5. Creates a pull request for each verified fix
+6. Respects `open_pull_requests_limit` to avoid PR floods
+
+### GitHub Action
+
+AION ships with a reusable GitHub Action (`action.yml`). Add to your workflow:
+
+```yaml
+- uses: shenxianpeng/aion@main
+  with:
+    target: '.'
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+Or schedule it like Dependabot:
+
+```yaml
+name: AION Auto-Update
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shenxianpeng/aion@main
+```
+
+## 8. Track security drift and evolution
 
 ### Save a security baseline
 
@@ -243,7 +299,7 @@ uv run aion status
 uv run aion status --aion-dir ./.aion --output json
 ```
 
-## Operational notes
+## 9. Operational notes
 
 - The current release emits patch artifacts and `watch` can rewrite watched local files after verification; it does not rewrite live production files in place.
 - `sandbox_verification_commands` run inside the staged workspace, not inside your working tree.
