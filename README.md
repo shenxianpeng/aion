@@ -4,6 +4,7 @@
 [![CI](https://github.com/shenxianpeng/aion/actions/workflows/ci.yml/badge.svg)](https://github.com/shenxianpeng/aion/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/shenxianpeng/aion/graph/badge.svg?branch=main)](https://codecov.io/gh/shenxianpeng/aion)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://shenxianpeng.github.io/aion/)
+[![AION Auto-Update](https://img.shields.io/badge/AION-Auto--Update-blue)](https://github.com/marketplace/actions/aion-auto-update)
 
 > **Code Once, Live Forever.**
 
