@@ -102,7 +102,38 @@ aion advance-release <candidate-id>
 
 ## Configuration
 
-Place `.aion.yaml` in the target repository root:
+AION supports two config formats in `.aion.yaml`:
+
+### Updates block (recommended, Dependabot-like)
+
+```yaml
+updates:
+  - directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    provider: openai
+    model: gpt-4.1
+    ignore_paths:
+      - tests/*
+      - scripts/generated_*.py
+    auto_repair_issue_types:
+      - raw_sqlite_query
+      - hardcoded_secret
+      - missing_auth_decorator
+    auto_repair_min_confidence: 0.90
+    sandbox_mode: repository
+    sandbox_verification_commands:
+      - python -m pytest tests/unit
+    auto_approve_verified_fixes: false
+    rollback_on_verification_failure: true
+    open_pull_requests_limit: 5
+    labels:
+      - "aion"
+      - "security"
+```
+
+### Legacy flat format (still supported)
 
 ```yaml
 provider: openai
@@ -124,6 +155,43 @@ rollback_on_verification_failure: true
 
 CLI flags override equivalent settings from `.aion.yaml`.
 
+## GitHub Action
+
+AION ships as a reusable GitHub Action. Add it to any workflow:
+
+```yaml
+# .github/workflows/aion.yml
+name: AION Auto-Update
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: shenxianpeng/aion@main
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+Or run it locally:
+
+```bash
+aion auto-update --target ./ --dry-run   # Preview
+aion auto-update --target ./              # Live
+```
+
+CLI flags override equivalent settings from `.aion.yaml`.
+
 ## Command Surface
 
 Core analysis:
@@ -133,6 +201,7 @@ Core analysis:
 - `aion verify`
 - `aion run-incident`
 - `aion repair-eval`
+- `aion auto-update` ← **Dependabot-style: scan → fix → PR**
 
 Control plane:
 

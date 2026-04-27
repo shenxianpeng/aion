@@ -12,7 +12,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .config import AppConfig, ConfigError, load_app_config
+from .auto_update import AutoUpdateEngine, AutoUpdateResult
+from .config import AppConfig, ConfigError, UpdateConfig, load_app_config, load_update_configs
 from .context_extractor import ContextExtractor
 from .drift_detector import DriftDetector
 from .evaluation import compute_repair_metrics, evaluate_repair_cases, load_fixture_cases
@@ -684,6 +685,100 @@ def status(
         stdout_console.print("[dim]Knowledge base is empty. Repairs are recorded automatically.[/dim]")
 
     raise typer.Exit(code=0)
+
+
+@app.command("auto-update")
+def auto_update(
+    target: Path = typer.Option(Path("."), "--target", "-t", exists=True, resolve_path=True, help="Repository root to scan and fix."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Scan and plan but do not create pull requests."),
+    output: str = typer.Option("text", "--output", help="text or json"),
+) -> None:
+    """Scan the repository, generate verified fixes, and create Pull Requests.
+
+    Works like Dependabot: reads ``.aion.yaml`` for configuration (supports both
+    the ``updates:`` block format and the legacy flat format), scans Python files
+    for security incidents, generates deterministic patches, verifies them, and
+    opens pull requests for verified fixes.
+
+    When running in GitHub Actions, uses the ``GITHUB_TOKEN`` and ``gh`` CLI to
+    create PRs with the labels, reviewers, and assignees configured in ``.aion.yaml``.
+    """
+    root = target if target.is_dir() else target.parent
+
+    # Load configuration - prefer v2 update configs, fall back to legacy
+    try:
+        configs = load_update_configs(root)
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if not configs:
+        stdout_console.print("[yellow]No AION update configuration found. Using defaults.[/yellow]")
+        configs = [UpdateConfig()]
+
+    all_results: dict[str, AutoUpdateResult] = {}
+
+    for idx, update_config in enumerate(configs):
+        config_label = update_config.directory if len(configs) > 1 else "default"
+        stderr_console.print(f"[bold]Processing update config [{idx + 1}/{len(configs)}]: {config_label}[/bold]")
+
+        engine = AutoUpdateEngine(root=root, update_config=update_config)
+        result = engine.run(dry_run=dry_run)
+        all_results[config_label] = result
+
+    # Aggregate results
+    total_incidents = sum(r.incidents_found for r in all_results.values())
+    total_patches = sum(r.patches_generated for r in all_results.values())
+    total_verified = sum(r.patches_verified for r in all_results.values())
+    total_prs = sum(r.prs_created for r in all_results.values())
+    total_errors = sum(len(r.errors) for r in all_results.values())
+
+    if output == "json":
+        payload = {
+            "configs": [
+                {
+                    "label": label,
+                    "files_scanned": r.files_scanned,
+                    "incidents_found": r.incidents_found,
+                    "patches_generated": r.patches_generated,
+                    "patches_verified": r.patches_verified,
+                    "prs_created": r.prs_created,
+                    "errors": r.errors,
+                }
+                for label, r in all_results.items()
+            ],
+            "totals": {
+                "incidents_found": total_incidents,
+                "patches_generated": total_patches,
+                "patches_verified": total_verified,
+                "prs_created": total_prs,
+                "errors": total_errors,
+            },
+            "dry_run": dry_run,
+        }
+        stdout_console.print_json(json.dumps(payload))
+        raise typer.Exit(code=0)
+
+    # Rich text output
+    mode = "[yellow]DRY RUN[/yellow]" if dry_run else "[green]LIVE[/green]"
+    stdout_console.print(
+        Panel(
+            f"Mode: {mode}\n"
+            f"Configs: {len(all_results)}\n"
+            f"Incidents found: {total_incidents}\n"
+            f"Patches generated: {total_patches}\n"
+            f"Patches verified: {total_verified}\n"
+            f"PRs created: {total_prs}\n"
+            f"Errors: {total_errors}",
+            title="AION Auto-Update",
+        )
+    )
+
+    if total_prs == 0 and not dry_run:
+        stderr_console.print("[dim]No verified fixes to submit as PRs.[/dim]")
+
+    raise typer.Exit(code=0 if total_errors == 0 else 1)
+
+
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
     extra_ignore_patterns = extra_ignore_patterns or []
     if target.is_file():
