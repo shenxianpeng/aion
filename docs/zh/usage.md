@@ -2,7 +2,7 @@
 
 ## 前置条件
 
-- 运行 `scan` 前先设置 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`
+- 运行 `scan` 前先设置 `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`DEEPSEEK_API_KEY` 或 `QWEN_API_KEY`
 - 如果希望统一策略和 sandbox 默认值，请在目标仓库根目录放置 `.aion.yaml`
 - 需要机器可读输出时使用 `--output json`
 
@@ -194,7 +194,63 @@ uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
 - dependency pin 建议
 - code patch follow-up 动作
 
-## 7. 追踪安全漂移与系统演进
+## 7. 自动更新（Dependabot 风格）
+
+运行完整的扫描 → 修复 → PR 流程：
+
+```bash
+uv run aion auto-update --target ./
+```
+
+Dry-run 预览将要执行的操作，但不创建 PR：
+
+```bash
+uv run aion auto-update --target ./ --dry-run
+```
+
+`auto-update` 命令会：
+
+1. 读取 `.aion.yaml` 中的调度、策略和 PR 配置
+2. 扫描所有 Python 文件中的安全事件
+3. 为支持的问题类型生成确定性 patch
+4. 在隔离工作区中验证每个 patch
+5. 为每个已验证的修复创建 pull request
+6. 遵守 `open_pull_requests_limit` 以避免 PR 洪水
+
+### GitHub Action
+
+AION 提供了可复用的 GitHub Action（`action.yml`）。在你的 workflow 中添加：
+
+```yaml
+- uses: shenxianpeng/aion@main
+  with:
+    target: '.'
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+或像 Dependabot 一样定时调度：
+
+```yaml
+name: AION Auto-Update
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # 每周一早 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shenxianpeng/aion@main
+```
+
+## 8. 追踪安全漂移与系统演进
 
 ### 保存安全基线快照
 
@@ -241,7 +297,7 @@ uv run aion status
 uv run aion status --aion-dir ./.aion --output json
 ```
 
-## 运行说明
+## 9. 运行说明
 
 - 当前版本会生成 patch artifact；`watch` 仅会在验证通过后改写被监控的本地文件，不会直接原地改写生产环境文件。
 - `sandbox_verification_commands` 只会在 staged workspace 中执行，不会在你的工作树里直接运行。

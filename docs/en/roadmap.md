@@ -57,9 +57,9 @@ The repository now ships:
   auto-repairs newly detected incidents, and refreshes the baseline after each successful fix.
 - **Engine status dashboard**: `status` shows all saved snapshots and the full knowledge-base
   summary in a single view.
-- **Expanded LLM provider support**: Gemini and Azure OpenAI are now supported alongside
-  Anthropic and OpenAI, with automatic provider auto-detection from available environment
-  variables.
+- **Expanded LLM provider support**: Gemini, Azure OpenAI, DeepSeek, and Qwen are now supported
+  alongside Anthropic and OpenAI, with automatic provider auto-detection from available
+  environment variables.
 
 ## Next steps
 

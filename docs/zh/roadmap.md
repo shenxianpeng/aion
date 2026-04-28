@@ -53,8 +53,8 @@
 - **持续 watch 循环**：`watch` 按照可配置的时间间隔轮询目标目录，对新检测到的
   incident 自动修复，并在每次成功修复后刷新基线。
 - **引擎状态仪表盘**：`status` 在一个视图中展示所有已保存的快照和完整知识库摘要。
-- **LLM 提供商支持扩展**：新增 Gemini 和 Azure OpenAI，与原有的 Anthropic、OpenAI
-  并列支持，并可通过环境变量自动检测提供商。
+- **LLM 提供商支持扩展**：新增 Gemini、Azure OpenAI、DeepSeek 和 Qwen，与原有的
+  Anthropic、OpenAI 并列支持，并可通过环境变量自动检测提供商。
 
 ## 下一步
 

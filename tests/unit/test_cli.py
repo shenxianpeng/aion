@@ -3,6 +3,7 @@ from pathlib import Path
 import aion.cli as cli_module
 from typer.testing import CliRunner
 
+from aion.auto_update import AutoUpdateResult
 from aion.cli import app
 from aion.models import ContextProfile, Finding, Incident
 
@@ -302,6 +303,116 @@ def test_scan_requires_azure_api_key(monkeypatch, tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "AZURE_OPENAI_API_KEY is not set" in result.output
+
+
+def test_scan_requires_deepseek_api_key(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "sample.py"
+    target.write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    result = runner.invoke(app, ["scan", str(target), "--provider", "deepseek"])
+
+    assert result.exit_code == 2
+    assert "DEEPSEEK_API_KEY is not set" in result.output
+
+
+def test_scan_requires_qwen_api_key(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    target = tmp_path / "sample.py"
+    target.write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.delenv("QWEN_API_KEY", raising=False)
+
+    result = runner.invoke(app, ["scan", str(target), "--provider", "qwen"])
+
+    assert result.exit_code == 2
+    assert "QWEN_API_KEY is not set" in result.output
+
+
+def test_resolve_api_key_for_deepseek(monkeypatch) -> None:
+    from aion.cli import Provider, _resolve_api_key
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-deepseek")
+    assert _resolve_api_key(Provider.deepseek) == "sk-test-deepseek"
+
+
+def test_resolve_api_key_for_qwen(monkeypatch) -> None:
+    from aion.cli import Provider, _resolve_api_key
+
+    monkeypatch.setenv("QWEN_API_KEY", "sk-test-qwen")
+    assert _resolve_api_key(Provider.qwen) == "sk-test-qwen"
+
+
+def test_missing_api_key_message_for_deepseek() -> None:
+    from aion.cli import Provider, _missing_api_key_message
+
+    msg = _missing_api_key_message(Provider.deepseek)
+    assert "DEEPSEEK_API_KEY" in msg
+
+
+def test_missing_api_key_message_for_qwen() -> None:
+    from aion.cli import Provider, _missing_api_key_message
+
+    msg = _missing_api_key_message(Provider.qwen)
+    assert "QWEN_API_KEY" in msg
+
+
+def test_default_model_for_deepseek() -> None:
+    from aion.cli import Provider, _default_model_for_provider
+
+    assert _default_model_for_provider(Provider.deepseek) == "deepseek-chat"
+
+
+def test_default_model_for_qwen() -> None:
+    from aion.cli import Provider, _default_model_for_provider
+
+    assert _default_model_for_provider(Provider.qwen) == "qwen-plus"
+
+
+def test_auto_detect_provider_prefers_deepseek(monkeypatch) -> None:
+    from aion.cli import Provider, _auto_detect_provider
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-deepseek")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("QWEN_API_KEY", raising=False)
+
+    assert _auto_detect_provider() == Provider.deepseek
+
+
+def test_auto_detect_provider_prefers_qwen(monkeypatch) -> None:
+    from aion.cli import Provider, _auto_detect_provider
+
+    monkeypatch.setenv("QWEN_API_KEY", "sk-qwen")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    assert _auto_detect_provider() == Provider.qwen
+
+
+def test_auto_detect_provider_anthropic_is_fallback(monkeypatch) -> None:
+    from aion.cli import Provider, _auto_detect_provider
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("QWEN_API_KEY", raising=False)
+
+    assert _auto_detect_provider() == Provider.anthropic
+
+
+def test_provider_enum_has_deepseek_and_qwen() -> None:
+    from aion.cli import Provider
+
+    assert Provider.deepseek.value == "deepseek"
+    assert Provider.qwen.value == "qwen"
 
 
 def test_run_incident_uses_built_detector(monkeypatch, tmp_path: Path) -> None:
@@ -876,3 +987,111 @@ def test_serve_webhook_starts_and_accepts_event(tmp_path: Path, monkeypatch) -> 
     items = EventInbox(inbox_root).list_items(status="pending")
     assert len(items) == 1
     assert items[0].event.event_type == "runtime_alert"
+
+
+# ---------------------------------------------------------------------------
+# auto-update command
+# ---------------------------------------------------------------------------
+
+
+def test_auto_update_dry_run_with_no_files(tmp_path: Path, monkeypatch) -> None:
+    """auto-update --dry-run exits cleanly when no Python files exist."""
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["auto-update", "--target", str(tmp_path), "--dry-run"])
+    assert result.exit_code == 0
+    assert "Incidents found: 0" in result.output
+
+
+def test_auto_update_dry_run_with_files_no_config(tmp_path: Path, monkeypatch) -> None:
+    """auto-update --dry-run scans files with defaults when no .aion.yaml."""
+    runner = CliRunner()
+    (tmp_path / "main.py").write_text("x = 1\n")
+
+    def fake_run(self, dry_run=False):
+        r = AutoUpdateResult()
+        r.files_scanned = 1
+        r.incidents_found = 2
+        return r
+
+    monkeypatch.setattr(cli_module.AutoUpdateEngine, "run", fake_run)
+
+    result = runner.invoke(app, ["auto-update", "--target", str(tmp_path), "--dry-run"])
+    assert result.exit_code == 0
+    assert "Incidents found: 2" in result.output
+
+
+def test_auto_update_json_output(tmp_path: Path, monkeypatch) -> None:
+    """auto-update --output json emits structured JSON."""
+    import json
+
+    runner = CliRunner()
+
+    def fake_run(self, dry_run=False):
+        r = AutoUpdateResult()
+        r.files_scanned = 5
+        r.incidents_found = 1
+        r.patches_generated = 1
+        r.patches_verified = 1
+        return r
+
+    monkeypatch.setattr(cli_module.AutoUpdateEngine, "run", fake_run)
+
+    result = runner.invoke(app, ["auto-update", "--target", str(tmp_path), "--dry-run", "--output", "json"])
+    assert result.exit_code == 0
+    # CliRunner mixes stderr ("]: default\n") with stdout (JSON)
+    output = result.output
+    if "Processing" in output:
+        output = output.split("\n", 1)[1]
+    payload = json.loads(output)
+    assert payload["dry_run"] is True
+    assert payload["totals"]["incidents_found"] == 1
+    assert payload["totals"]["patches_generated"] == 1
+    assert payload["totals"]["patches_verified"] == 1
+
+
+def test_auto_update_handles_multiple_configs(tmp_path: Path, monkeypatch) -> None:
+    """auto-update processes multiple updates blocks."""
+    runner = CliRunner()
+    (tmp_path / ".aion.yaml").write_text(
+        "\n".join(
+            [
+                "updates:",
+                "  - directory: \"/\"",
+                "    provider: openai",
+                "  - directory: \"/src\"",
+                "    provider: qwen",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_count: list[int] = []
+
+    def fake_run(self, dry_run=False):
+        run_count.append(1)
+        r = AutoUpdateResult()
+        r.files_scanned = 2
+        r.incidents_found = 0
+        return r
+
+    monkeypatch.setattr(cli_module.AutoUpdateEngine, "run", fake_run)
+
+    result = runner.invoke(app, ["auto-update", "--target", str(tmp_path), "--dry-run"])
+    assert result.exit_code == 0
+    assert len(run_count) == 2  # one per update block
+
+
+def test_auto_update_error_exit(tmp_path: Path, monkeypatch) -> None:
+    """auto-update exits with code 1 when errors occur."""
+    runner = CliRunner()
+
+    def fake_run(self, dry_run=False):
+        r = AutoUpdateResult()
+        r.errors = ["gh CLI not found"]
+        return r
+
+    monkeypatch.setattr(cli_module.AutoUpdateEngine, "run", fake_run)
+
+    result = runner.invoke(app, ["auto-update", "--target", str(tmp_path)])
+    assert result.exit_code == 1

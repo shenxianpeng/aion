@@ -1,9 +1,85 @@
 # 配置
 
-在目标仓库根目录放置 `.aion.yaml`。AION 会用它控制仓库扫描默认值，以及带
-`repo_root` 的编排命令。
+在目标仓库根目录放置 `.aion.yaml`。AION 用它控制仓库扫描默认值、编排命令，以及自动更新工作流。
 
-## 示例
+AION 支持两种配置格式：
+
+1. **Updates 块格式**（类似 Dependabot）—— 推荐用于自动更新工作流。
+   使用 ``updates:`` 块，每个块对应一个目录 / 策略。
+2. **旧版扁平格式** —— 仍然支持，保证向后兼容。
+
+## Updates 块格式（推荐）
+
+```yaml
+updates:
+  - directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    provider: openai
+    model: gpt-4.1
+    ignore_paths:
+      - tests/*
+      - scripts/generated_*.py
+    auto_repair_issue_types:
+      - raw_sqlite_query
+      - hardcoded_secret
+      - missing_auth_decorator
+    auto_repair_min_confidence: 0.90
+    sandbox_mode: repository
+    sandbox_verification_commands:
+      - python -m pytest tests/unit
+    auto_approve_verified_fixes: false
+    rollback_on_verification_failure: true
+    open_pull_requests_limit: 5
+    labels:
+      - "aion"
+      - "security"
+    reviewers:
+      - "team:security"
+    assignees:
+      - "username"
+    target_branch: "main"
+    commit_message_prefix: "[AION]"
+```
+
+## 字段说明
+
+### 核心字段
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `provider` | string | `null` | `scan` 阶段使用的 LLM 提供方，支持 `anthropic`、`openai`、`deepseek` 或 `qwen` |
+| `model` | string | provider 默认值 | `scan` 的显式模型覆盖 |
+| `ignore_paths` | list | `[]` | 仓库扫描时跳过的 glob 模式 |
+| `auto_repair_issue_types` | list | 内建集合 | 允许进入自动 sandbox 修复的 incident 类型 |
+| `auto_repair_min_confidence` | float | `0.85` | 触发自动修复所需的最小 incident 置信度 |
+| `sandbox_mode` | string | `repository` | `file` 为单文件 staging，`repository` 为整仓 staging |
+| `sandbox_verification_commands` | list | `[]` | 在 staged sandbox 内执行的项目级命令 |
+| `auto_approve_verified_fixes` | boolean | `false` | staged 验证通过时直接给出 `approved_for_rollout` |
+| `rollback_on_verification_failure` | boolean | `true` | staged 验证失败时给出 `rollback`，而不是 `needs_human_review` |
+
+### 自动更新字段
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `directory` | string | `/` | 操作的相对目录 |
+| `schedule.interval` | string | `weekly` | `daily`、`weekly` 或 `monthly`（供参考；AION 本身按需运行） |
+| `schedule.day` | string | `monday` | `weekly` 间隔对应的星期 |
+| `schedule.time` | string | `09:00` | 时间（24 小时制） |
+| `schedule.timezone` | string | `UTC` | 调度时区 |
+| `open_pull_requests_limit` | integer | `5` | 最大并发打开的 AION PR 数 |
+| `labels` | list | `[]` | 自动创建的 PR 上打的标签 |
+| `reviewers` | list | `[]` | 自动创建的 PR 上请求的评审人 |
+| `assignees` | list | `[]` | 自动创建的 PR 的负责人 |
+| `target_branch` | string | `main` | 自动创建的 PR 的目标分支 |
+| `commit_message_prefix` | string | `[AION]` | 提交信息前缀 |
+
+## 旧版扁平格式
+
+仍然支持旧的 `.aion.yaml` 格式，保证向后兼容：
 
 ```yaml
 provider: openai
@@ -22,20 +98,6 @@ sandbox_verification_commands:
 auto_approve_verified_fixes: false
 rollback_on_verification_failure: true
 ```
-
-## 字段说明
-
-| 字段 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `provider` | string | `null` | `scan` 阶段使用的 LLM 提供方，支持 `anthropic` 或 `openai` |
-| `model` | string | provider 默认值 | `scan` 的显式模型覆盖 |
-| `ignore_paths` | list | `[]` | 仓库扫描时跳过的 glob 模式 |
-| `auto_repair_issue_types` | list | 内建集合 | 允许进入自动 sandbox 修复的 incident 类型 |
-| `auto_repair_min_confidence` | float | `0.85` | 触发自动修复所需的最小 incident 置信度 |
-| `sandbox_mode` | string | `repository` | `file` 为单文件 staging，`repository` 为整仓 staging |
-| `sandbox_verification_commands` | list | `[]` | 在 staged sandbox 内执行的项目级命令 |
-| `auto_approve_verified_fixes` | boolean | `false` | staged 验证通过时直接给出 `approved_for_rollout` |
-| `rollback_on_verification_failure` | boolean | `true` | staged 验证失败时给出 `rollback`，而不是 `needs_human_review` |
 
 ## 解析规则
 
