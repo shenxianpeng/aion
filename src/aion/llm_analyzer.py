@@ -8,7 +8,7 @@ from typing import Literal
 
 from .models import ContextProfile, Finding, LLMScanResponse, SemgrepFinding
 
-LLMProvider = Literal["anthropic", "openai", "gemini", "azure"]
+LLMProvider = Literal["anthropic", "openai", "gemini", "azure", "deepseek", "qwen"]
 
 
 class LLMAnalyzerError(RuntimeError):
@@ -146,6 +146,30 @@ class LLMAnalyzer:
                 )
             )
 
+        if self.provider == "deepseek":
+            try:
+                from openai import OpenAI
+            except ImportError as exc:
+                raise LLMAnalyzerError("openai is not installed") from exc
+            return instructor.from_openai(
+                OpenAI(
+                    api_key=self.api_key,
+                    base_url="https://api.deepseek.com/v1",
+                )
+            )
+
+        if self.provider == "qwen":
+            try:
+                from openai import OpenAI
+            except ImportError as exc:
+                raise LLMAnalyzerError("openai is not installed") from exc
+            return instructor.from_openai(
+                OpenAI(
+                    api_key=self.api_key,
+                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                )
+            )
+
         raise LLMAnalyzerError(f"unsupported provider: {self.provider}")
 
     def _create_completion(self, client, prompt: str) -> LLMScanResponse:
@@ -163,7 +187,7 @@ class LLMAnalyzer:
                 ],
             )
 
-        if self.provider in ("openai", "azure"):
+        if self.provider in ("openai", "azure", "deepseek", "qwen"):
             return client.chat.completions.create(
                 model=self.model,
                 max_completion_tokens=1800,

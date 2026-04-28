@@ -63,6 +63,12 @@ Choose at least one LLM provider for `scan`:
 export OPENAI_API_KEY=your_key
 # or
 export ANTHROPIC_API_KEY=your_key
+# or
+export DEEPSEEK_API_KEY=your_key
+# or
+export QWEN_API_KEY=your_key
+# or
+export GEMINI_API_KEY=your_key
 ```
 
 Scan a repository:
@@ -104,6 +110,17 @@ aion advance-release <candidate-id>
 ## Configuration
 
 AION supports two config formats in `.aion.yaml`:
+
+### Supported Providers
+
+| Provider | Env Variable | Default Model |
+|---|---|---|
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4.1` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| Qwen (Tongyi) | `QWEN_API_KEY` | `qwen-plus` |
+| Gemini | `GEMINI_API_KEY` | `gemini-2.0-flash` |
+| Azure OpenAI | `AZURE_OPENAI_API_KEY` | `gpt-4` |
 
 ### Updates block (recommended, Dependabot-like)
 
@@ -182,6 +199,9 @@ jobs:
       - uses: shenxianpeng/aion@main
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          # or use deepseek, qwen, anthropic, gemini:
+          # deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+          # qwen_api_key: ${{ secrets.QWEN_API_KEY }}
 ```
 
 Or run it locally:

@@ -76,6 +76,8 @@ class Provider(str, Enum):
     openai = "openai"
     gemini = "gemini"
     azure = "azure"
+    deepseek = "deepseek"
+    qwen = "qwen"
 
 
 @app.callback()
@@ -91,7 +93,7 @@ def scan(
         "--ai-generated",
         help="Explicit files or directories to treat as AI-generated. Can be repeated.",
     ),
-    provider: Provider | None = typer.Option(None, "--provider", help="LLM provider: anthropic, openai, gemini, or azure."),
+    provider: Provider | None = typer.Option(None, "--provider", help="LLM provider: anthropic, openai, gemini, azure, deepseek, or qwen."),
     model: str | None = typer.Option(None, help="Model name. Defaults depend on provider."),
     output: str = typer.Option("text", "--output", help="text or json"),
     verbose: bool = typer.Option(False, "--verbose", help="Print context and raw prompts to stderr."),
@@ -811,6 +813,10 @@ def _resolve_api_key(provider: Provider) -> str | None:
         return os.getenv("GEMINI_API_KEY")
     if provider == Provider.azure:
         return os.getenv("AZURE_OPENAI_API_KEY")
+    if provider == Provider.deepseek:
+        return os.getenv("DEEPSEEK_API_KEY")
+    if provider == Provider.qwen:
+        return os.getenv("QWEN_API_KEY")
     return None
 
 
@@ -827,6 +833,10 @@ def _missing_api_key_message(provider: Provider) -> str:
             "export AZURE_OPENAI_API_KEY=your_key\n"
             "Also set the endpoint: export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com"
         )
+    if provider == Provider.deepseek:
+        return "DEEPSEEK_API_KEY is not set. Export it before running, for example: export DEEPSEEK_API_KEY=your_key"
+    if provider == Provider.qwen:
+        return "QWEN_API_KEY is not set. Export it before running, for example: export QWEN_API_KEY=your_key"
     return "Provider API key is not set."
 
 
@@ -839,6 +849,10 @@ def _default_model_for_provider(provider: Provider) -> str:
         return "gemini-2.0-flash"
     if provider == Provider.azure:
         return "gpt-4"
+    if provider == Provider.deepseek:
+        return "deepseek-chat"
+    if provider == Provider.qwen:
+        return "qwen-plus"
     raise ValueError(f"unsupported provider: {provider}")
 
 
@@ -852,6 +866,10 @@ def _auto_detect_provider() -> Provider:
         return Provider.gemini
     if os.getenv("AZURE_OPENAI_API_KEY"):
         return Provider.azure
+    if os.getenv("DEEPSEEK_API_KEY"):
+        return Provider.deepseek
+    if os.getenv("QWEN_API_KEY"):
+        return Provider.qwen
     return Provider.anthropic
 
 

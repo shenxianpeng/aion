@@ -23,6 +23,12 @@ inputs:
   gemini_api_key:
     description: 'Google Gemini API key (optional, for LLM-assisted scanning)'
     required: false
+  deepseek_api_key:
+    description: 'DeepSeek API key (optional, for LLM-assisted scanning)'
+    required: false
+  qwen_api_key:
+    description: 'Qwen (Alibaba Tongyi Qianwen) API key (optional, for LLM-assisted scanning)'
+    required: false
 
 runs:
   using: composite
@@ -53,6 +59,8 @@ runs:
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
+        QWEN_API_KEY: ${{ inputs.qwen_api_key }}
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         aion auto-update \
