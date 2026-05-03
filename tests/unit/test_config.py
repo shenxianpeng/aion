@@ -192,18 +192,15 @@ def test_load_update_configs_invalid_indentation_raises(tmp_path: Path) -> None:
         load_update_configs(tmp_path)
 
 
-def test_updates_block_is_not_supported(tmp_path: Path) -> None:
+def test_unknown_config_field_raises(tmp_path: Path) -> None:
     (tmp_path / ".aion.yaml").write_text(
         "\n".join(
             [
-                "updates:",
-                "  - directory: \"/\"",
-                "    provider: qwen",
-                "    model: qwen-plus",
+                "unknown_field: true",
             ]
         ),
         encoding="utf-8",
     )
 
-    with pytest.raises(ConfigError, match="updates blocks are no longer supported"):
+    with pytest.raises(ConfigError, match="unsupported config field: unknown_field"):
         load_app_config(tmp_path)

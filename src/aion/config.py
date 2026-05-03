@@ -46,6 +46,31 @@ class ConfigError(RuntimeError):
     pass
 
 
+SUPPORTED_CONFIG_FIELDS = {
+    "provider",
+    "model",
+    "ignore_paths",
+    "auto_repair_issue_types",
+    "auto_repair_min_confidence",
+    "sandbox_mode",
+    "sandbox_verification_commands",
+    "auto_approve_verified_fixes",
+    "rollback_on_verification_failure",
+    "schedule",
+    "schedule_interval",
+    "schedule_day",
+    "schedule_time",
+    "schedule_timezone",
+    "open_pull_requests_limit",
+    "labels",
+    "reviewers",
+    "assignees",
+    "target_branch",
+    "commit_message_prefix",
+    "directory",
+}
+
+
 def load_app_config(root: Path) -> AppConfig:
     """Load configuration from .aion.yaml."""
     config_path = root / ".aion.yaml"
@@ -92,10 +117,8 @@ def _parse_config(path: Path) -> AppConfig:
         key = key.strip()
         value = value.strip()
 
-        if key == "updates":
-            raise ConfigError(
-                "updates blocks are no longer supported; use flat .aion.yaml fields"
-            )
+        if key not in SUPPORTED_CONFIG_FIELDS:
+            raise ConfigError(f"unsupported config field: {key}")
 
         if not value:
             nested_value, index = _parse_flat_nested_value(lines, index, path)
