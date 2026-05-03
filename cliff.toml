@@ -24,6 +24,24 @@ conventional_commits = true
 filter_unconventional = false
 require_conventional = false
 split_commits = false
+commit_preprocessors = [
+  # Normalize common non-conventional prefixes into conventional format.
+  # Patterns are tried in order; only the first match is applied.
+  { pattern = "(?i)^bugfix\\s+(.*)", replace = "fix: $1" },
+  { pattern = "^Fix\\s+(.*)", replace = "fix: $1" },
+  { pattern = "^Add\\s+(.*)", replace = "feat: Add $1" },
+  { pattern = "^Remove\\s+(.*)", replace = "refactor: Remove $1" },
+  { pattern = "^Switch\\s+(.*)", replace = "refactor: Switch $1" },
+  { pattern = "^Replace\\s+(.*)", replace = "refactor: Replace $1" },
+  { pattern = "^Wire\\s+(.*)", replace = "feat: Wire $1" },
+  { pattern = "^Make\\s+(.*)", replace = "refactor: Make $1" },
+  { pattern = "^Elevate\\s+(.*)", replace = "feat: Elevate $1" },
+  { pattern = "^Expand\\s+(.*)", replace = "feat: Expand $1" },
+  { pattern = "^Adopt\\s+(.*)", replace = "feat: Adopt $1" },
+  { pattern = "^Rename\\s+(.*)", replace = "refactor: Rename $1" },
+  { pattern = "^Refactor\\s+(.*)", replace = "refactor: $1" },
+  { pattern = "^Update\\s+(.*)", replace = "docs: Update $1" },
+]
 commit_parsers = [
   { message = "^feat", group = "Features" },
   { message = "^fix", group = "Bug Fixes" },
