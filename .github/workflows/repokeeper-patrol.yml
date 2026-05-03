@@ -1,0 +1,40 @@
+name: RepoKeeper Daily Patrol
+
+on:
+  schedule:
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  patrol:
+    name: Daily Patrol
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: write
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install RepoKeeper
+        run: python -m pip install repokeeper
+
+      - name: Run Daily Patrol
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: repokeeper patrol --repo "$GITHUB_REPOSITORY" --summary | tee patrol-summary.md "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload patrol summary
+        uses: actions/upload-artifact@v7
+        with:
+          name: patrol-summary
+          path: patrol-summary.md

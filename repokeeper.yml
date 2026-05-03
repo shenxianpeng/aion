@@ -1,0 +1,83 @@
+# RepoKeeper Maintainer Profile
+# https://github.com/shenxianpeng/repokeeper
+
+maintainer: shenxianpeng
+
+tone:
+  language: en
+  style: friendly
+  emoji: false
+  closing: "thanks"
+
+style:
+  code_style: |
+    Follow the existing AION architecture and keep changes scoped.
+    Use type hints for Python code.
+    Prefer existing Typer, Pydantic, pytest, and uv patterns already in this repository.
+    Avoid broad refactors unless an issue explicitly asks for them.
+  testing: pytest
+  linting: true
+  formatting: ruff
+
+pr:
+  min_tests: true
+  max_files_per_pr: 12
+  require_changelog: false
+  auto_merge: false
+  review_required: true
+
+tech:
+  preferred:
+    - python
+    - typer
+    - pydantic
+    - pytest
+    - uv
+  avoid:
+    - ad-hoc shell parsing
+    - unrelated dependency additions
+  target_python: "3.10"
+  target_node: "20"
+
+notifications:
+  email: ""
+  telegram: ""
+  wechat: ""
+  daily_summary: true
+  urgent_only: false
+
+agent:
+  model: deepseek-chat
+  implement: true
+  max_context_files: 40
+  temperature: 0.1
+  skip_keywords:
+    - "needs product decision"
+    - "breaking change"
+    - "requires credentials"
+  verify_commands:
+    - uv run pytest tests/unit
+
+radar:
+  enabled: true
+  keywords:
+    - bug
+    - crash
+    - security
+    - vulnerability
+    - false positive
+    - auto repair
+    - semgrep
+    - llm
+    - openai
+    - anthropic
+    - gemini
+  confidence_threshold: 0.75
+  auto_create_issue: false
+
+patrol:
+  enabled: true
+  schedule: "0 8 * * 1-5"
+  auto_upgrade_deps: false
+  stale_days: 60
+  ci_auto_fix: true
