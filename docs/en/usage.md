@@ -194,7 +194,7 @@ The current defense planner can emit:
 - dependency pin recommendations
 - code-patch follow-up actions
 
-## 7. Auto-Update (Dependabot-style)
+## 7. Auto-Update
 
 Run the full scan → fix → PR pipeline:
 
@@ -229,7 +229,7 @@ AION ships with a reusable GitHub Action (`action.yml`). Add to your workflow:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-Or schedule it like Dependabot:
+Or schedule it with GitHub Actions:
 
 ```yaml
 name: AION Auto-Update

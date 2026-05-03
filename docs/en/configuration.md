@@ -3,47 +3,43 @@
 Place `.aion.yaml` in the target repository root. AION reads it for repository
 scan defaults, orchestration commands, and the auto-update workflow.
 
-AION supports two config formats:
+AION uses a flat config format. Auto-update fields such as `schedule`,
+`open_pull_requests_limit`, and `labels` are configured at the top level.
 
-1. **Updates block** (Dependabot-like) — preferred for the auto-update workflow.
-   Uses ``updates:`` blocks, one per directory / policy.
-2. **Legacy flat format** — still supported for backward compatibility.
-
-## Updates block format (recommended)
+## Flat Format
 
 ```yaml
-updates:
-  - directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    provider: openai
-    model: gpt-4.1
-    ignore_paths:
-      - tests/*
-      - scripts/generated_*.py
-    auto_repair_issue_types:
-      - raw_sqlite_query
-      - hardcoded_secret
-      - missing_auth_decorator
-    auto_repair_min_confidence: 0.90
-    sandbox_mode: repository
-    sandbox_verification_commands:
-      - python -m pytest tests/unit
-    auto_approve_verified_fixes: false
-    rollback_on_verification_failure: true
-    open_pull_requests_limit: 5
-    labels:
-      - "aion"
-      - "security"
-    reviewers:
-      - "team:security"
-    assignees:
-      - "username"
-    target_branch: "main"
-    commit_message_prefix: "[AION]"
+directory: "/"
+schedule:
+  interval: "weekly"
+  day: "monday"
+  time: "09:00"
+  timezone: "Asia/Shanghai"
+provider: openai
+model: gpt-4.1
+ignore_paths:
+  - tests/*
+  - scripts/generated_*.py
+auto_repair_issue_types:
+  - raw_sqlite_query
+  - hardcoded_secret
+  - missing_auth_decorator
+auto_repair_min_confidence: 0.90
+sandbox_mode: repository
+sandbox_verification_commands:
+  - python -m pytest tests/unit
+auto_approve_verified_fixes: false
+rollback_on_verification_failure: true
+open_pull_requests_limit: 5
+labels:
+  - "aion"
+  - "security"
+reviewers:
+  - "team:security"
+assignees:
+  - "username"
+target_branch: "main"
+commit_message_prefix: "[AION]"
 ```
 
 ## Fields
@@ -77,28 +73,6 @@ updates:
 | `assignees` | list | `[]` | Assignees for auto-created PRs |
 | `target_branch` | string | `main` | Base branch for auto-created PRs |
 | `commit_message_prefix` | string | `[AION]` | Prefix for commit messages |
-
-## Legacy flat format
-
-Still supported for backward compatibility with the older `.aion.yaml` format:
-
-```yaml
-provider: openai
-model: gpt-4.1
-ignore_paths:
-  - tests/*
-  - scripts/generated_*.py
-auto_repair_issue_types:
-  - raw_sqlite_query
-  - hardcoded_secret
-  - missing_auth_decorator
-auto_repair_min_confidence: 0.90
-sandbox_mode: repository
-sandbox_verification_commands:
-  - python -m pytest tests/unit
-auto_approve_verified_fixes: false
-rollback_on_verification_failure: true
-```
 
 ## Resolution rules
 

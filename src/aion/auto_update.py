@@ -2,7 +2,7 @@
 
 Implements the AION auto-update workflow:
 
-1. Load configuration from ``.aion.yaml`` (supports ``updates:`` blocks or legacy flat format).
+1. Load flat configuration from ``.aion.yaml``.
 2. Scan the repository for security incidents.
 3. Generate deterministic patch artifacts for supported issue types.
 4. Verify patches in sandboxes.

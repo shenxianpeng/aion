@@ -697,17 +697,16 @@ def auto_update(
 ) -> None:
     """Scan the repository, generate verified fixes, and create Pull Requests.
 
-    Works like Dependabot: reads ``.aion.yaml`` for configuration (supports both
-    the ``updates:`` block format and the legacy flat format), scans Python files
-    for security incidents, generates deterministic patches, verifies them, and
-    opens pull requests for verified fixes.
+    Reads the flat ``.aion.yaml`` configuration, scans Python files for security
+    incidents, generates deterministic patches, verifies them, and opens pull
+    requests for verified fixes.
 
     When running in GitHub Actions, uses the ``GITHUB_TOKEN`` and ``gh`` CLI to
     create PRs with the labels, reviewers, and assignees configured in ``.aion.yaml``.
     """
     root = target if target.is_dir() else target.parent
 
-    # Load configuration - prefer v2 update configs, fall back to legacy
+    # Load flat auto-update configuration.
     try:
         configs = load_update_configs(root)
     except ConfigError as exc:

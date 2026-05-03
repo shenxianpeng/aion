@@ -194,7 +194,7 @@ uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
 - dependency pin 建议
 - code patch follow-up 动作
 
-## 7. 自动更新（Dependabot 风格）
+## 7. 自动更新
 
 运行完整的扫描 → 修复 → PR 流程：
 
@@ -229,7 +229,7 @@ AION 提供了可复用的 GitHub Action（`action.yml`）。在你的 workflow 
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-或像 Dependabot 一样定时调度：
+或用 GitHub Actions 定时调度：
 
 ```yaml
 name: AION Auto-Update

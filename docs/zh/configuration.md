@@ -2,47 +2,43 @@
 
 在目标仓库根目录放置 `.aion.yaml`。AION 用它控制仓库扫描默认值、编排命令，以及自动更新工作流。
 
-AION 支持两种配置格式：
+AION 使用扁平配置格式。`schedule`、`open_pull_requests_limit` 和
+`labels` 等自动更新字段直接配置在顶层。
 
-1. **Updates 块格式**（类似 Dependabot）—— 推荐用于自动更新工作流。
-   使用 ``updates:`` 块，每个块对应一个目录 / 策略。
-2. **旧版扁平格式** —— 仍然支持，保证向后兼容。
-
-## Updates 块格式（推荐）
+## 扁平配置格式
 
 ```yaml
-updates:
-  - directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    provider: openai
-    model: gpt-4.1
-    ignore_paths:
-      - tests/*
-      - scripts/generated_*.py
-    auto_repair_issue_types:
-      - raw_sqlite_query
-      - hardcoded_secret
-      - missing_auth_decorator
-    auto_repair_min_confidence: 0.90
-    sandbox_mode: repository
-    sandbox_verification_commands:
-      - python -m pytest tests/unit
-    auto_approve_verified_fixes: false
-    rollback_on_verification_failure: true
-    open_pull_requests_limit: 5
-    labels:
-      - "aion"
-      - "security"
-    reviewers:
-      - "team:security"
-    assignees:
-      - "username"
-    target_branch: "main"
-    commit_message_prefix: "[AION]"
+directory: "/"
+schedule:
+  interval: "weekly"
+  day: "monday"
+  time: "09:00"
+  timezone: "Asia/Shanghai"
+provider: openai
+model: gpt-4.1
+ignore_paths:
+  - tests/*
+  - scripts/generated_*.py
+auto_repair_issue_types:
+  - raw_sqlite_query
+  - hardcoded_secret
+  - missing_auth_decorator
+auto_repair_min_confidence: 0.90
+sandbox_mode: repository
+sandbox_verification_commands:
+  - python -m pytest tests/unit
+auto_approve_verified_fixes: false
+rollback_on_verification_failure: true
+open_pull_requests_limit: 5
+labels:
+  - "aion"
+  - "security"
+reviewers:
+  - "team:security"
+assignees:
+  - "username"
+target_branch: "main"
+commit_message_prefix: "[AION]"
 ```
 
 ## 字段说明
@@ -76,28 +72,6 @@ updates:
 | `assignees` | list | `[]` | 自动创建的 PR 的负责人 |
 | `target_branch` | string | `main` | 自动创建的 PR 的目标分支 |
 | `commit_message_prefix` | string | `[AION]` | 提交信息前缀 |
-
-## 旧版扁平格式
-
-仍然支持旧的 `.aion.yaml` 格式，保证向后兼容：
-
-```yaml
-provider: openai
-model: gpt-4.1
-ignore_paths:
-  - tests/*
-  - scripts/generated_*.py
-auto_repair_issue_types:
-  - raw_sqlite_query
-  - hardcoded_secret
-  - missing_auth_decorator
-auto_repair_min_confidence: 0.90
-sandbox_mode: repository
-sandbox_verification_commands:
-  - python -m pytest tests/unit
-auto_approve_verified_fixes: false
-rollback_on_verification_failure: true
-```
 
 ## 解析规则
 

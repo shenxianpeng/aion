@@ -109,7 +109,7 @@ aion advance-release <candidate-id>
 
 ## Configuration
 
-AION supports two config formats in `.aion.yaml`:
+AION uses a flat `.aion.yaml` config:
 
 ### Supported Providers
 
@@ -122,38 +122,15 @@ AION supports two config formats in `.aion.yaml`:
 | Gemini | `GEMINI_API_KEY` | `gemini-2.0-flash` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` | `gpt-4` |
 
-### Updates block (recommended, Dependabot-like)
+### Config example
 
 ```yaml
-updates:
-  - directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    provider: openai
-    model: gpt-4.1
-    ignore_paths:
-      - tests/*
-      - scripts/generated_*.py
-    auto_repair_issue_types:
-      - raw_sqlite_query
-      - hardcoded_secret
-      - missing_auth_decorator
-    auto_repair_min_confidence: 0.90
-    sandbox_mode: repository
-    sandbox_verification_commands:
-      - python -m pytest tests/unit
-    auto_approve_verified_fixes: false
-    rollback_on_verification_failure: true
-    open_pull_requests_limit: 5
-    labels:
-      - "aion"
-      - "security"
-```
-
-### Legacy flat format (still supported)
-
-```yaml
+directory: "/"
+schedule:
+  interval: "weekly"
+  day: "monday"
+  time: "09:00"
+  timezone: "UTC"
 provider: openai
 model: gpt-4.1
 ignore_paths:
@@ -169,6 +146,16 @@ sandbox_verification_commands:
   - python -m pytest tests/unit
 auto_approve_verified_fixes: false
 rollback_on_verification_failure: true
+open_pull_requests_limit: 5
+labels:
+  - "aion"
+  - "security"
+reviewers:
+  - "team:security"
+assignees:
+  - "username"
+target_branch: "main"
+commit_message_prefix: "[AION]"
 ```
 
 CLI flags override equivalent settings from `.aion.yaml`.
@@ -222,7 +209,7 @@ Core analysis:
 - `aion verify`
 - `aion run-incident`
 - `aion repair-eval`
-- `aion auto-update` ← **Dependabot-style: scan → fix → PR**
+- `aion auto-update` ← **scan → fix → PR**
 
 Control plane:
 

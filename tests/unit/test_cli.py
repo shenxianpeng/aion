@@ -1050,17 +1050,15 @@ def test_auto_update_json_output(tmp_path: Path, monkeypatch) -> None:
     assert payload["totals"]["patches_verified"] == 1
 
 
-def test_auto_update_handles_multiple_configs(tmp_path: Path, monkeypatch) -> None:
-    """auto-update processes multiple updates blocks."""
+def test_auto_update_handles_flat_config(tmp_path: Path, monkeypatch) -> None:
+    """auto-update processes the flat config once."""
     runner = CliRunner()
     (tmp_path / ".aion.yaml").write_text(
         "\n".join(
             [
-                "updates:",
-                "  - directory: \"/\"",
-                "    provider: openai",
-                "  - directory: \"/src\"",
-                "    provider: qwen",
+                "directory: \"/src\"",
+                "provider: openai",
+                "open_pull_requests_limit: 3",
             ]
         ),
         encoding="utf-8",
@@ -1079,7 +1077,7 @@ def test_auto_update_handles_multiple_configs(tmp_path: Path, monkeypatch) -> No
 
     result = runner.invoke(app, ["auto-update", "--target", str(tmp_path), "--dry-run"])
     assert result.exit_code == 0
-    assert len(run_count) == 2  # one per update block
+    assert len(run_count) == 1
 
 
 def test_auto_update_error_exit(tmp_path: Path, monkeypatch) -> None:
