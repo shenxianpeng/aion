@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.7.2, mkdocs-material-9.7.6">
     
     
       
@@ -582,15 +582,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-auto-update-dependabot-style" class="md-nav__link">
+  <a href="#7-auto-update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Auto-Update (Dependabot-style)
+        7. Auto-Update
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="7. Auto-Update (Dependabot-style)">
+    <nav class="md-nav" aria-label="7. Auto-Update">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -874,15 +874,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-auto-update-dependabot-style" class="md-nav__link">
+  <a href="#7-auto-update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Auto-Update (Dependabot-style)
+        7. Auto-Update
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="7. Auto-Update (Dependabot-style)">
+    <nav class="md-nav" aria-label="7. Auto-Update">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1122,7 +1122,7 @@
 <li>dependency pin recommendations</li>
 <li>code-patch follow-up actions</li>
 </ul>
-<h2 id="7-auto-update-dependabot-style">7. Auto-Update (Dependabot-style)<a class="headerlink" href="#7-auto-update-dependabot-style" title="Permanent link">&para;</a></h2>
+<h2 id="7-auto-update">7. Auto-Update<a class="headerlink" href="#7-auto-update" title="Permanent link">&para;</a></h2>
 <p>Run the full scan → fix → PR pipeline:</p>
 <div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>uv<span class="w"> </span>run<span class="w"> </span>aion<span class="w"> </span>auto-update<span class="w"> </span>--target<span class="w"> </span>./
 </code></pre></div>
@@ -1146,7 +1146,7 @@
 <a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span>
 <a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">    </span><span class="nt">OPENAI_API_KEY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.OPENAI_API_KEY }}</span>
 </code></pre></div>
-<p>Or schedule it like Dependabot:</p>
+<p>Or schedule it with GitHub Actions:</p>
 <div class="language-yaml highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AION Auto-Update</span>
 <a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="nt">on</span><span class="p">:</span>
 <a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">schedule</span><span class="p">:</span>
