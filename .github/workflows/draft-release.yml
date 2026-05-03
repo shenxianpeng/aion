@@ -1,0 +1,107 @@
+name: Draft Release Notes
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: draft-release-notes
+  cancel-in-progress: true
+
+jobs:
+  update_release_draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@db5fb34fa772531a3ece57ca434f579eb334e0fb  # v2.75.30
+        with:
+          tool: git-cliff
+
+      - name: Determine next version
+        id: version
+        shell: bash
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(git-cliff --config cliff.toml --bumped-version)"
+          version="$(tr -d '[:space:]' <<< "$version")"
+          if [[ -z "$version" ]]; then
+            echo "git-cliff did not return a bumped version" >&2
+            exit 1
+          fi
+
+          if [[ "$version" != v* ]]; then
+            version="v${version}"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        shell: bash
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git-cliff \
+            --config cliff.toml \
+            --unreleased \
+            --tag "$RELEASE_TAG" \
+            --strip header \
+            --output RELEASE_NOTES.md \
+            --verbose
+
+      - name: Upsert draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          draft_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --jq 'map(select(.draft == true)) | sort_by(.created_at) | last | .id // ""'
+          )"
+
+          if [[ -n "$draft_id" ]]; then
+            jq -n \
+              --arg tag_name "$RELEASE_TAG" \
+              --arg target_commitish "$GITHUB_SHA" \
+              --arg name "$RELEASE_TAG" \
+              --rawfile body RELEASE_NOTES.md \
+              '{
+                tag_name: $tag_name,
+                target_commitish: $target_commitish,
+                name: $name,
+                body: $body,
+                draft: true,
+                prerelease: false
+              }' > release-payload.json
+
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
+              --input release-payload.json
+          else
+            gh release create "$RELEASE_TAG" \
+              --draft \
+              --title "$RELEASE_TAG" \
+              --target "${GITHUB_SHA}" \
+              --notes-file RELEASE_NOTES.md
+          fi
