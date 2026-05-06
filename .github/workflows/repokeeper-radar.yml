@@ -5,40 +5,22 @@ on:
     - cron: "0 */3 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   radar:
     name: Community Radar
-    runs-on: ubuntu-latest
-    permissions:
-      issues: read
-      discussions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: "3.11"
-
-      - name: Install RepoKeeper
-        run: python -m pip install repokeeper
-
-      - name: Run Community Radar
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          RKP_SMTP_HOST: ${{ secrets.RKP_SMTP_HOST || '' }}
-          RKP_SMTP_PORT: ${{ secrets.RKP_SMTP_PORT || '587' }}
-          RKP_SMTP_USER: ${{ secrets.RKP_SMTP_USER || '' }}
-          RKP_SMTP_PASS: ${{ secrets.RKP_SMTP_PASS || '' }}
-          RKP_TELEGRAM_CHAT_ID: ${{ secrets.RKP_TELEGRAM_CHAT_ID || '' }}
-        run: repokeeper radar --repo "$GITHUB_REPOSITORY" --summary | tee radar-summary.md "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload radar summary
-        uses: actions/upload-artifact@v7
-        with:
-          name: radar-summary
-          path: radar-summary.md
+    uses: shenxianpeng/.github/.github/workflows/repokeeper-radar.yml@main
+    with:
+      repo: ${{ github.repository }}
+      python_version: "3.11"
+    secrets:
+      deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+      smtp_host: ${{ secrets.RKP_SMTP_HOST }}
+      smtp_port: ${{ secrets.RKP_SMTP_PORT }}
+      smtp_user: ${{ secrets.RKP_SMTP_USER }}
+      smtp_pass: ${{ secrets.RKP_SMTP_PASS }}
+      telegram_chat_id: ${{ secrets.RKP_TELEGRAM_CHAT_ID }}
