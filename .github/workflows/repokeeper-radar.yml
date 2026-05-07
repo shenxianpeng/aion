@@ -20,6 +20,4 @@ jobs:
     secrets:
       deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
       repo_token: ${{ secrets.GITHUB_TOKEN }}
-      smtp_user: ${{ secrets.RKP_SMTP_USER }}
-      smtp_pass: ${{ secrets.RKP_SMTP_PASS }}
       telegram_chat_id: ${{ secrets.RKP_TELEGRAM_CHAT_ID }}
