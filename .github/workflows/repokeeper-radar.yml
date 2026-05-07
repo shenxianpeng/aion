@@ -2,12 +2,14 @@ name: RepoKeeper Community Radar
 
 on:
   schedule:
-    - cron: "0 */3 * * 1-5"
+    - cron: "0 8 * * 1"
   workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
+  discussions: read
+  issues: write
 
 jobs:
   radar:
