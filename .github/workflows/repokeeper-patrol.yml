@@ -17,7 +17,6 @@ jobs:
     uses: shenxianpeng/.github/.github/workflows/repokeeper-patrol.yml@main
     with:
       repo: ${{ github.repository }}
-      python_version: "3.11"
     secrets:
       deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
       repo_token: ${{ secrets.GITHUB_TOKEN }}
