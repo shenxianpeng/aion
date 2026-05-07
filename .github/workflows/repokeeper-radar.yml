@@ -18,7 +18,7 @@ jobs:
       python_version: "3.11"
     secrets:
       deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
       smtp_host: ${{ secrets.RKP_SMTP_HOST }}
       smtp_port: ${{ secrets.RKP_SMTP_PORT }}
       smtp_user: ${{ secrets.RKP_SMTP_USER }}
