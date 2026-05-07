@@ -1,13 +1,15 @@
-name: RepoKeeper Daily Patrol
+name: RepoKeeper Patrol
 
 on:
   schedule:
-    - cron: "0 8 * * 1-5"
+    - cron: "0 8 * * 1"
   workflow_dispatch:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
+  issues: read
+  pull-requests: write
 
 jobs:
   patrol:
