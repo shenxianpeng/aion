@@ -1,6 +1,8 @@
-name: RepoKeeper PR Labeler
+name: RepoKeeper Labeler
 
 on:
+  issues:
+    types: [opened]
   pull_request:
     types: [opened, reopened, synchronize]
 
@@ -10,6 +12,7 @@ jobs:
   labeler:
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     uses: shenxianpeng/repokeeper/.github/workflows/labeler.yml@main
     with:
