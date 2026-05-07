@@ -39,7 +39,6 @@ jobs:
     with:
       repo: ${{ github.repository }}
       issue_number: ${{ github.event.inputs.issue || github.event.issue.number }}
-      python_version: "3.11"
     secrets:
       deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
       repo_token: ${{ secrets.REPOKEEPER_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

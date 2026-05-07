@@ -1,0 +1,19 @@
+name: RepoKeeper PR Labeler
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  labeler:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: shenxianpeng/repokeeper/.github/workflows/labeler.yml@main
+    with:
+      repo: ${{ github.repository }}
+    secrets:
+      deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
