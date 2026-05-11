@@ -68,6 +68,7 @@ SUPPORTED_CONFIG_FIELDS = {
     "target_branch",
     "commit_message_prefix",
     "directory",
+    "updates",
 }
 
 
@@ -81,14 +82,51 @@ def load_app_config(root: Path) -> AppConfig:
 
 
 def load_update_configs(root: Path) -> list[UpdateConfig]:
-    """Load AION auto-update configuration from flat .aion.yaml."""
+    """Load AION auto-update configuration from flat .aion.yaml.
+
+    Supports two formats:
+
+    1. **Flat format** – top-level key-value pairs (no ``updates`` wrapper)::
+
+           provider: openai
+           directory: "/"
+
+       Returns a single ``UpdateConfig`` with those values.
+
+    2. **Updates-wrapper format** – a top-level ``updates`` key containing
+       a list of update config blocks::
+
+           updates:
+             - directory: "/"
+               schedule:
+                 interval: "weekly"
+               ...
+             - directory: "/subdir"
+               ...
+
+       Returns one ``UpdateConfig`` per list item.
+    """
     config_path = root / ".aion.yaml"
     if not config_path.exists():
         return [UpdateConfig()]
 
+    config = _parse_config(config_path)
+
+    # Check if the config uses the "updates" wrapper format
+    updates_raw = config.__dict__.get("__updates__")
+    if updates_raw and isinstance(updates_raw, list):
+        result: list[UpdateConfig] = []
+        for item_data in updates_raw:
+            if not isinstance(item_data, dict):
+                continue
+            app_config = _app_config_from_data(item_data)
+            result.append(_update_config_from_app_config(app_config))
+        return result if result else [UpdateConfig()]
+
+    # Legacy flat format (no updates wrapper)
     flat = {
         k: v
-        for k, v in _parse_config(config_path).__dict__.items()
+        for k, v in config.__dict__.items()
         if not k.startswith("_")
     }
     return [UpdateConfig(**flat)]  # type: ignore[arg-type]
@@ -121,13 +159,20 @@ def _parse_config(path: Path) -> AppConfig:
             raise ConfigError(f"unsupported config field: {key}")
 
         if not value:
+            if key == "updates":
+                nested_value, index = _parse_updates(lines, index, path)
+                data["__updates__"] = nested_value
+                continue
             nested_value, index = _parse_flat_nested_value(lines, index, path)
             data[key] = nested_value
             continue
 
         data[key] = _parse_scalar(value)
 
-    return _app_config_from_data(data)
+    config = _app_config_from_data(data)
+    if "__updates__" in data:
+        config.__dict__["__updates__"] = data["__updates__"]
+    return config
 
 
 def _parse_flat_nested_value(lines: list[str], start_index: int, path: Path) -> tuple[object, int]:
@@ -170,6 +215,32 @@ def _parse_flat_nested_value(lines: list[str], start_index: int, path: Path) -> 
             raise ConfigError(f"invalid nested config line in {path}: {nested_raw}")
         data[key] = _parse_scalar(value)
     return data, index
+
+
+def _update_config_from_app_config(cfg: AppConfig) -> UpdateConfig:
+    """Convert an AppConfig to an UpdateConfig."""
+    return UpdateConfig(
+        provider=cfg.provider,
+        model=cfg.model,
+        ignore_paths=list(cfg.ignore_paths),
+        auto_repair_issue_types=list(cfg.auto_repair_issue_types),
+        auto_repair_min_confidence=cfg.auto_repair_min_confidence,
+        sandbox_mode=cfg.sandbox_mode,
+        sandbox_verification_commands=list(cfg.sandbox_verification_commands),
+        auto_approve_verified_fixes=cfg.auto_approve_verified_fixes,
+        rollback_on_verification_failure=cfg.rollback_on_verification_failure,
+        schedule_interval=cfg.schedule_interval,
+        schedule_day=cfg.schedule_day,
+        schedule_time=cfg.schedule_time,
+        schedule_timezone=cfg.schedule_timezone,
+        open_pull_requests_limit=cfg.open_pull_requests_limit,
+        labels=list(cfg.labels),
+        reviewers=list(cfg.reviewers),
+        assignees=list(cfg.assignees),
+        target_branch=cfg.target_branch,
+        commit_message_prefix=cfg.commit_message_prefix,
+        directory=cfg.directory,
+    )
 
 
 def _app_config_from_data(data: dict[str, object]) -> AppConfig:
@@ -263,6 +334,125 @@ def _app_config_from_data(data: dict[str, object]) -> AppConfig:
         commit_message_prefix=commit_message_prefix,
         directory=directory,
     )
+
+
+# Updates-wrapper parser
+
+def _parse_updates(lines: list[str], start_index: int, path: Path) -> tuple[list[dict[str, object]], int]:
+    """Parse the ``updates: [...]`` block, returning a list of config dicts.
+
+    Each list item under ``updates`` is a flat mapping that may contain
+    nested sub-mappings (e.g. ``schedule:``) and nested lists (e.g.
+    ``ignore_paths:``).
+    """
+    # Collect all lines indented under ``updates:``
+    nested_lines: list[str] = []
+    index = start_index
+    while index < len(lines):
+        nested_raw = lines[index]
+        nested = nested_raw.strip()
+        if not nested or nested.startswith("#"):
+            index += 1
+            continue
+        if not nested_raw.startswith((" ", "\t")):
+            break
+        nested_lines.append(nested_raw)
+        index += 1
+
+    if not nested_lines:
+        return [], index
+
+    # Determine the base indentation (where ``- `` items sit)
+    base_indent = len(nested_lines[0]) - len(nested_lines[0].lstrip())
+
+    # Group lines into list-item blocks.  Each block starts with ``- ``
+    # at *base_indent*; continuation lines are indented deeper.
+    item_blocks: list[list[str]] = []
+    current: list[str] = []
+    for raw in nested_lines:
+        stripped = raw.lstrip()
+        indent = len(raw) - len(stripped)
+        if stripped.startswith("- ") and indent == base_indent:
+            if current:
+                item_blocks.append(current)
+            # Strip the ``- `` prefix, keep the rest of the line
+            current = [raw[:indent] + stripped[2:]]
+        else:
+            current.append(raw)
+    if current:
+        item_blocks.append(current)
+
+    # Parse each item block as a flat key-value dict
+    configs: list[dict[str, object]] = []
+    for block in item_blocks:
+        item_data = _parse_nested_block(block, path)
+        configs.append(item_data)
+
+    return configs, index
+
+
+def _parse_nested_block(lines: list[str], path: Path) -> dict[str, object]:
+    """Parse a recursively-nested key-value block at any indentation level.
+
+    Handles:
+
+    * Simple key-value pairs: ``key: value``
+    * Nested mappings where the value is empty (indented children follow)
+    * Inline lists: ``key:`` followed by ``- item`` lines
+    """
+    data: dict[str, object] = {}
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.strip()
+
+        if not stripped or stripped.startswith("#"):
+            i += 1
+            continue
+
+        if ":" not in stripped:
+            raise ConfigError(f"invalid config line in {path}: {raw}")
+
+        key, _, value = stripped.partition(":")
+        key = key.strip()
+        value = value.strip()
+
+        if not value:
+            # Collect continuation lines at strictly-greater indentation
+            key_indent = len(raw) - len(raw.lstrip())
+            i += 1
+            nested_lines: list[str] = []
+            while i < len(lines):
+                next_raw = lines[i]
+                next_stripped = next_raw.strip()
+                if not next_stripped or next_stripped.startswith("#"):
+                    i += 1
+                    continue
+                next_indent = len(next_raw) - len(next_stripped)
+                if next_indent <= key_indent:
+                    break
+                nested_lines.append(next_raw)
+                i += 1
+
+            if nested_lines and nested_lines[0].strip().startswith("- "):
+                # Inline list
+                items: list[str] = []
+                for list_raw in nested_lines:
+                    list_stripped = list_raw.strip()
+                    if list_stripped.startswith("- "):
+                        items.append(_parse_scalar(list_stripped[2:].strip()))
+                data[key] = items
+            elif nested_lines:
+                # Nested mapping
+                data[key] = _parse_nested_block(nested_lines, path)
+            else:
+                data[key] = []
+            continue
+
+        data[key] = _parse_scalar(value)
+        i += 1
+
+    return data
 
 
 # Helpers

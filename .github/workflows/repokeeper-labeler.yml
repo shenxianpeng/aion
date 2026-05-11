@@ -10,17 +10,15 @@ permissions: {}
 
 jobs:
   labeler:
-    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
       pull-requests: write
-    steps:
-      - name: Run RepoKeeper Labeler
-        uses: shenxianpeng/repokeeper/labeler@v1
-        with:
-          repo: ${{ github.repository }}
-          issue: ${{ github.event.issue.number || '' }}
-          pr: ${{ github.event.pull_request.number || '' }}
-          llm_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+    uses: shenxianpeng/.github/.github/workflows/repokeeper-labeler.yml@main
+    with:
+      repo: ${{ github.repository }}
+      issue: ${{ github.event.issue.number || '' }}
+      pr: ${{ github.event.pull_request.number || '' }}
+    secrets:
+      deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+      github_token: ${{ secrets.GITHUB_TOKEN }}
