@@ -20,6 +20,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fnmatch import fnmatch
+
 from .config import UpdateConfig, load_update_configs
 from .context_extractor import ContextExtractor
 from .knowledge_base import KnowledgeBase
@@ -113,7 +115,7 @@ class AutoUpdateEngine:
         except ValueError:
             relative = path.as_posix()
         for pattern in self.config.ignore_paths:
-            if Path(relative).match(pattern) or Path(path.name).match(pattern):
+            if fnmatch(relative, pattern) or fnmatch(path.name, pattern):
                 return True
         return False
 
