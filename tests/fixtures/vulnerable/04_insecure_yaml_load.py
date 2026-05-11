@@ -4,4 +4,4 @@ import yaml
 
 
 def load_config(data: str) -> dict:
-    return yaml.load(data)
+    return yaml.safe_load(data)
