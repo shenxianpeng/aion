@@ -775,7 +775,24 @@ def auto_update(
     )
 
     if total_prs == 0 and not dry_run:
-        stderr_console.print("[dim]No verified fixes to submit as PRs.[/dim]")
+        if total_verified > 0:
+            if total_errors:
+                stderr_console.print(
+                    f"[yellow]{total_verified} verified fixes were not submitted as PRs "
+                    f"({total_errors} error{'s' if total_errors != 1 else ''}).[/yellow]"
+                )
+            else:
+                stderr_console.print(
+                    f"[yellow]{total_verified} verified fixes were not submitted as PRs.[/yellow]"
+                )
+        else:
+            stderr_console.print("[dim]No verified fixes to submit as PRs.[/dim]")
+
+    if total_errors:
+        for label, r in all_results.items():
+            if r.errors:
+                for err in r.errors:
+                    stderr_console.print(f"[red]  • [{label}] {err}[/red]")
 
     raise typer.Exit(code=0 if total_errors == 0 else 1)
 

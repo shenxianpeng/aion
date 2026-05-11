@@ -87,7 +87,7 @@ class AutoUpdateEngine:
             return result
 
         # 5. Create PRs for verified fixes
-        result.prs_created = self._create_pull_requests(repair_records, context, dry_run=dry_run)
+        result.prs_created = self._create_pull_requests(repair_records, context, result, dry_run=dry_run)
 
         return result
 
@@ -121,6 +121,7 @@ class AutoUpdateEngine:
         self,
         records: list[RepairAttemptRecord],
         context: ContextProfile,
+        result: AutoUpdateResult,
         dry_run: bool = False,
     ) -> int:
         """Create pull requests for verified repair records.
@@ -134,12 +135,18 @@ class AutoUpdateEngine:
         existing_count = self._count_existing_aion_prs()
         available_slots = max(0, limit - existing_count)
         if available_slots <= 0:
+            result.errors.append(
+                f"PR limit reached: {existing_count} open AION PRs already exist (limit: {limit})"
+            )
             return 0
 
         created = 0
         for record in records[:available_slots]:
-            if self._create_single_pr(record, context, dry_run=dry_run):
+            ok, err = self._create_single_pr(record, context, dry_run=dry_run)
+            if ok:
                 created += 1
+            elif err:
+                result.errors.append(err)
 
         return created
 
@@ -164,13 +171,14 @@ class AutoUpdateEngine:
         record: RepairAttemptRecord,
         context: ContextProfile,
         dry_run: bool = False,
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Create a single PR for one repair record.
 
-        Returns True if the PR was created successfully.
+        Returns (True, None) if the PR was created successfully,
+        or (False, error_message) on failure.
         """
         if record.artifact is None:
-            return False
+            return False, "No patch artifact available for this record"
 
         artifact = record.artifact
         target_path = Path(record.target)
@@ -183,51 +191,60 @@ class AutoUpdateEngine:
         body = self._pr_body(record, context)
 
         if dry_run:
-            return True
+            return True, None
 
         try:
             # Stash any local changes first
-            subprocess.run(["git", "-C", str(self.root), "stash", "--include-untracked"], capture_output=True, check=False)
+            subprocess.run(
+                ["git", "-C", str(self.root), "stash", "--include-untracked"],
+                capture_output=True, check=False,
+            )
 
             # Create and switch to new branch
             base_branch = self._current_branch() or self.config.target_branch
-            subprocess.run(
+            checkout_result = subprocess.run(
                 ["git", "-C", str(self.root), "checkout", "-b", branch_name, f"origin/{base_branch}"],
-                capture_output=True,
-                check=False,
+                capture_output=True, text=True, check=False,
             )
+            if checkout_result.returncode != 0:
+                err = checkout_result.stderr.strip() or f"Failed to create branch {branch_name}"
+                return False, f"Git checkout failed: {err}"
 
             # Apply the patch
             target_path.write_text(artifact.patched_content, encoding="utf-8")
 
             # Stage, commit
             relative_target = self._relative_path(target_path)
-            subprocess.run(
+            add_result = subprocess.run(
                 ["git", "-C", str(self.root), "add", relative_target],
-                capture_output=True,
-                check=False,
+                capture_output=True, text=True, check=False,
             )
+            if add_result.returncode != 0:
+                return False, f"Git add failed: {add_result.stderr.strip()}"
+
             commit_message = f"{self.config.commit_message_prefix} fix: {self._commit_summary(record)}"
-            subprocess.run(
+            commit_result = subprocess.run(
                 ["git", "-C", str(self.root), "commit", "-m", commit_message],
-                capture_output=True,
-                check=False,
+                capture_output=True, text=True, check=False,
             )
+            if commit_result.returncode != 0:
+                err = commit_result.stderr.strip() or "commit failed"
+                return False, f"Git commit failed: {err}"
 
             # Push
             push_result = subprocess.run(
                 ["git", "-C", str(self.root), "push", "origin", branch_name, "--force"],
-                capture_output=True,
-                text=True,
-                check=False,
+                capture_output=True, text=True, check=False,
             )
             if push_result.returncode != 0:
                 # Fallback: try without force
-                subprocess.run(
+                push_result = subprocess.run(
                     ["git", "-C", str(self.root), "push", "origin", branch_name],
-                    capture_output=True,
-                    check=False,
+                    capture_output=True, text=True, check=False,
                 )
+            if push_result.returncode != 0:
+                err = push_result.stderr.strip() or "push failed"
+                return False, f"Git push failed: {err}"
 
             # Create PR via gh CLI
             pr_args = [
@@ -250,14 +267,17 @@ class AutoUpdateEngine:
             # Switch back to original branch
             subprocess.run(
                 ["git", "-C", str(self.root), "checkout", base_branch],
-                capture_output=True,
-                check=False,
+                capture_output=True, check=False,
             )
 
-            return pr_result.returncode == 0
+            if pr_result.returncode != 0:
+                err = pr_result.stderr.strip() or "gh pr create failed"
+                return False, f"PR creation failed: {err}"
 
-        except OSError:
-            return False
+            return True, None
+
+        except OSError as exc:
+            return False, f"OS error during PR creation: {exc}"
 
     def _branch_name(self, artifact: PatchArtifact) -> str:
         """Generate a unique branch name for the patch."""
