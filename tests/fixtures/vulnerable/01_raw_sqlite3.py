@@ -6,5 +6,5 @@ import sqlite3
 def lookup_user(user_id: str) -> list[tuple]:
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM users WHERE id = '{user_id}'")
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     return cursor.fetchall()
