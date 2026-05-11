@@ -5,7 +5,6 @@ from fastapi import APIRouter
 router = APIRouter()
 
 
-@app.callback
 @router.get("/admin/users")
 @require_permissions("admin:read")
 def list_admin_users():
