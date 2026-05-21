@@ -14,6 +14,7 @@ from rich.table import Table
 
 from .auto_update import AutoUpdateEngine, AutoUpdateResult
 from .config import AppConfig, ConfigError, UpdateConfig, load_app_config, load_update_configs
+from .self_evolve import EvolutionLedger, SelfEvolveEngine, SelfEvolveResult
 from .context_extractor import ContextExtractor
 from .drift_detector import DriftDetector
 from .evaluation import compute_repair_metrics, evaluate_repair_cases, load_fixture_cases
@@ -795,6 +796,136 @@ def auto_update(
                     stderr_console.print(f"[red]  • [{label}] {err}[/red]")
 
     raise typer.Exit(code=0 if total_errors == 0 else 1)
+
+
+@app.command("self-evolve")
+def self_evolve(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Scan and plan but do not modify source code."),
+    evolve_heuristics: bool = typer.Option(True, "--evolve-heuristics/--no-evolve-heuristics", help="Discover and add new detection patterns."),
+    evolve_strategies: bool = typer.Option(True, "--evolve-strategies/--no-evolve-strategies", help="Promote successful repair strategies and prune failing ones."),
+    calibrate_confidence: bool = typer.Option(True, "--calibrate-confidence/--no-calibrate-confidence", help="Auto-tune confidence thresholds from historical data."),
+    output: str = typer.Option("text", "--output", help="text or json"),
+    show_ledger: bool = typer.Option(False, "--show-ledger", help="Display the evolution ledger instead of running evolution."),
+) -> None:
+    """Evolve AION's own source code — the core of 'Code Once, Live Forever.'
+
+    Runs AION's scan → detect → repair → verify pipeline on its own source
+    code, applies verified patches to itself, and continuously improves its
+    detection heuristics and repair strategies.
+
+    This is what makes AION a *self-evolving* code engine: it doesn't just
+    fix other projects — it improves itself.
+
+    Phases:    
+      1. Self-Scan & Self-Repair: Scan own .py files, generate and verify patches.
+      2. Heuristic Evolution: Discover new detection patterns from LLM findings.
+      3. Strategy Evolution: Promote successful fix strategies, prune failing ones.  
+      4. Confidence Calibration: Auto-tune confidence thresholds per heuristic.
+
+    Use --show-ledger to review the engine's evolution history.
+    """
+    engine = SelfEvolveEngine()
+
+    if show_ledger:
+        ledger = EvolutionLedger(base_dir=engine.ledger_dir)
+        entries = ledger.entries()
+
+        if output == "json":
+            stdout_console.print_json(json.dumps({
+                "ledger": entries,
+                "summary": ledger.summary(),
+            }))
+            raise typer.Exit(code=0)
+
+        summary = ledger.summary()
+        stdout_console.print(
+            Panel(
+                f"Total evolution events: {summary['total_evolution_events']}\n"
+                f"By type: {summary['by_type']}",
+                title="Evolution Ledger",
+            )
+        )
+        if entries:
+            table = Table(title="Evolution History")
+            table.add_column("Timestamp")
+            table.add_column("Type")
+            table.add_column("Summary")
+            for entry in entries[-20:]:  # Show last 20 entries
+                ts = str(entry.get("timestamp", ""))[:19]
+                table.add_row(ts, str(entry.get("type", "")), str(entry.get("summary", "")))
+            stdout_console.print(table)
+        else:
+            stdout_console.print("[dim]No evolution events recorded yet. Run `aion self-evolve` to begin.[/dim]")
+        raise typer.Exit(code=0)
+
+    stderr_console.print(
+        f"[bold]AION Self-Evolution[/bold] — source: {engine.source_root}"
+    )
+    stderr_console.print(
+        f"  evolve_heuristics={evolve_heuristics}  "
+        f"evolve_strategies={evolve_strategies}  "
+        f"calibrate_confidence={calibrate_confidence}"
+    )
+
+    result = engine.evolve(
+        dry_run=dry_run,
+        evolve_heuristics=evolve_heuristics,
+        evolve_strategies=evolve_strategies,
+        calibrate_confidence=calibrate_confidence,
+    )
+
+    if output == "json":
+        payload = {
+            "files_scanned": result.files_scanned,
+            "incidents_found": result.incidents_found,
+            "patches_generated": result.patches_generated,
+            "patches_verified": result.patches_verified,
+            "patches_applied": result.patches_applied,
+            "heuristics_added": result.heuristics_added,
+            "strategies_promoted": result.strategies_promoted,
+            "strategies_pruned": result.strategies_pruned,
+            "confidence_calibrations": result.confidence_calibrations,
+            "errors": result.errors,
+            "dry_run": dry_run,
+            "ledger_summary": EvolutionLedger(base_dir=engine.ledger_dir).summary(),
+        }
+        stdout_console.print_json(json.dumps(payload))
+        raise typer.Exit(code=0)
+
+    # Rich text output
+    mode = "[yellow]DRY RUN[/yellow]" if dry_run else "[green]LIVE[/green]"
+    stdout_console.print(
+        Panel(
+            f"Mode: {mode}\n"
+            f"Source files scanned: {result.files_scanned}\n"
+            f"Incidents found: {result.incidents_found}\n"
+            f"Patches generated: {result.patches_generated}\n"
+            f"Patches verified: {result.patches_verified}\n"
+            f"Patches applied: {result.patches_applied}\n"
+            f"Heuristics added: {result.heuristics_added}\n"
+            f"Strategies promoted: {result.strategies_promoted}\n"
+            f"Strategies pruned: {result.strategies_pruned}\n"
+            f"Confidence calibrations: {result.confidence_calibrations}\n"
+            f"Errors: {len(result.errors)}",
+            title="AION Self-Evolution",
+        )
+    )
+
+    if result.errors:
+        for err in result.errors:
+            stderr_console.print(f"[red]  • {err}[/red]")
+
+    if result.patches_applied > 0 and not dry_run:
+        stderr_console.print(
+            f"[green]🎉 AION has evolved! {result.patches_applied} patch(es) applied to its own source.[/green]"
+        )
+        stderr_console.print(
+            "[dim]Run `aion self-evolve --show-ledger` to review the evolution history.[/dim]"
+        )
+    elif result.patches_applied == 0 and result.incidents_found == 0:
+        stderr_console.print("[green]AION's own code is clean — no incidents detected.[/green]")
+
+    raise typer.Exit(code=0 if not result.errors else 1)
 
 
 def _resolve_target_files(target: Path, extra_ignore_patterns: list[str] | None = None) -> list[Path]:
