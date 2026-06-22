@@ -21,7 +21,6 @@ def _load_context(path: str) -> ContextProfile:
     [
         ("tests/fixtures/vulnerable/01_raw_sqlite3.py", "tests/fixtures/vulnerable/01_context.json", "parameterize_sqlite_query"),
         ("tests/fixtures/vulnerable/02_hardcoded_secret.py", "tests/fixtures/vulnerable/02_context.json", "env_secret"),
-        ("tests/fixtures/vulnerable/03_missing_auth_decorator.py", "tests/fixtures/vulnerable/03_context.json", "inject_auth_decorator"),
         ("tests/fixtures/vulnerable/04_insecure_yaml_load.py", "tests/fixtures/vulnerable/04_context.json", "safe_yaml_load"),
         ("tests/fixtures/vulnerable/05_command_injection.py", "tests/fixtures/vulnerable/05_context.json", "shlex_quote_command"),
         ("tests/fixtures/vulnerable/06_eval_injection.py", "tests/fixtures/vulnerable/06_context.json", "ast_literal_eval"),
@@ -99,7 +98,7 @@ def test_verifier_accepts_parameterized_sqlite_variant_without_fixture_exact_str
     assert verification.verdict == "verified_fix"
 
 
-def test_repair_pipeline_handles_multi_route_auth_gap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_missing_auth_is_reported_but_not_auto_repaired(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
     target = tmp_path / "routes.py"
     target.write_text(
@@ -108,11 +107,6 @@ def test_repair_pipeline_handles_multi_route_auth_gap(monkeypatch: pytest.Monkey
                 "from fastapi import APIRouter",
                 "",
                 "router = APIRouter()",
-                "",
-                '@router.get("/users")',
-                '@require_permissions("admin")',
-                "def list_users():",
-                '    return {"users": ["alice"]}',
                 "",
                 '@router.get("/audit")',
                 "def audit_log():",
@@ -126,47 +120,15 @@ def test_repair_pipeline_handles_multi_route_auth_gap(monkeypatch: pytest.Monkey
 
     detector = IncidentDetector()
     incidents = detector.detect(target, context)
-    artifact = PatchGenerator().generate(target, incidents, context)
 
+    # The gap is still surfaced for a human...
     assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
-    assert artifact is not None
-    assert artifact.patched_content.count("@require_permissions") == 2
+    assert incidents[0].recommended_action == "review"
+    assert incidents[0].remediation_strategy == ""
 
-    verification = Verifier().verify(artifact)
-    assert verification.verdict == "verified_fix"
-
-
-def test_repair_pipeline_handles_app_route_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr("aion.repair.semgrep_available", lambda: False)
-    target = tmp_path / "app_routes.py"
-    target.write_text(
-        "\n".join(
-            [
-                "from fastapi import FastAPI",
-                "",
-                "app = FastAPI()",
-                "",
-                '@app.get("/admin")',
-                "def admin_dashboard():",
-                '    return {"ok": True}',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    context = ContextProfile(auth_decorators=["@login_required"])
-
-    detector = IncidentDetector()
-    incidents = detector.detect(target, context)
+    # ...but no deterministic patch is generated for it (auto-injection is unsafe).
     artifact = PatchGenerator().generate(target, incidents, context)
-
-    assert [incident.issue_type for incident in incidents] == ["missing_auth_decorator"]
-    assert artifact is not None
-    assert "@login_required" in artifact.patched_content
-    assert "@app.get" in artifact.patched_content
-
-    verification = Verifier().verify(artifact)
-    assert verification.verdict == "verified_fix"
+    assert artifact is None
 
 
 def test_incident_detector_merges_semgrep_and_llm_findings_into_incidents(tmp_path: Path) -> None:
