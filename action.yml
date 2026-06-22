@@ -1,5 +1,5 @@
 name: AION Auto-Update
-description: 'AION: The Self-Evolving Code Engine — scan, fix, and auto-PR'
+description: 'AION: scan a Python repo and open verified security auto-fix pull requests'
 author: shenxianpeng
 branding:
   icon: shield
