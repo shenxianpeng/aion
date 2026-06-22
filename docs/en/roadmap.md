@@ -1,119 +1,52 @@
 # Roadmap
 
-This roadmap reflects the current shipped state of AION and the remaining work
-required to move from a local control-plane prototype toward production-grade
-self-healing.
+AION is intentionally small and focused: scan a Python repository, generate
+deterministic patches for a set of high-confidence security issues, verify them,
+and open pull requests only for fixes that pass.
 
 ## Current status
 
-The repository now ships:
+The project ships:
 
 - context-aware Python scanning with repository profiling and Semgrep triage
-- deterministic repair artifacts plus standalone verification
-- repair evaluation with persisted repair records and metrics
-- sandbox orchestration for single events, event queues, inbox items, and webhooks
-- release candidates with approval, staged advancement, rejection, and rollback
-- runtime-first defense planning for containment before rollout
-- drift detection, knowledge base, and a continuous watch loop for self-evolution
-- knowledge-base confidence boosts wired into the policy engine
+- deterministic repair for seven security issue types, each with an AST-level
+  verification assertion
+- a verification gate (syntax + assertion + optional Semgrep re-scan) that gates
+  every pull request
+- `auto-update` to scan, verify, and open pull requests for verified fixes
+- a reusable GitHub Action
+- drift detection (`snapshot` / `drift`), a continuous `watch` loop, and a
+  `status` view over snapshots and repair history
 
-## Completed phases
+## Design principles
 
-### Phase 0: Trusted foundation — shipped in v1.0.0
+- **Trustworthy over broad.** A small set of fixes that are always verified beats
+  a large set that sometimes corrupts code.
+- **Report, don't guess.** When a fix cannot be proven safe (for example, a
+  missing auth decorator), AION reports it for review instead of editing the code.
+- **Deterministic and auditable.** Patches are template-based and every one is
+  re-checked by an independent AST assertion.
 
-- Findings are upgraded into structured incidents.
-- Repair, verification, orchestration, and release flows share JSON models.
-- Fixtures cover the incident lifecycle end to end.
+## Possible next steps
 
-### Phase 1: Automatic repair closed loop — shipped in v1.0.0
+These are directions, not commitments. Each should be weighed against the
+"trustworthy over broad" principle before being taken on.
 
-- Deterministic repair is implemented for the first supported issue classes.
-- Verification runs syntax checks, Semgrep re-scan, assertions, and optional sandbox commands.
-- `repair`, `verify`, and `run-incident` provide a local closed loop.
+- **Reliability transparency** — surface deterministic repair and verification
+  pass rates per issue type, and ship golden-path examples that run end-to-end in CI.
+- **A few more high-confidence fixes** — additional issue types only where a
+  deterministic patch can be verified with the same rigor as the existing seven.
+- **Better repository test selection** for verification, beyond a single file's
+  AST assertion.
+- **Quality signal** — bring back a lightweight repair-quality report
+  (success / verification-pass / false-fix rates) over a fixture corpus.
 
-### Phase 2: Self-verification and learning — shipped in v1.0.0
+## What is explicitly out of scope
 
-- Repair attempts can be persisted as audit records.
-- `repair-eval` computes repair success, verification pass, false-fix, and rollback rates.
-- Failure outcomes are captured for later template and policy refinement.
+To keep the project controllable, these are non-goals:
 
-### Phase 3: Pre-production autonomy prototype — shipped in v1.0.0
-
-- The orchestrator accepts JSON events, queue payloads, inbox items, and webhooks.
-- Policy gating decides whether an incident can enter automatic sandbox remediation.
-- Repository-level sandbox execution supports project-specific verification commands.
-- Release candidate management now covers approval and staged rollout decisions.
-
-### Phase 4: Self-evolving engine — shipped in v1.1.0
-
-- **Drift detection**: `snapshot` saves a point-in-time security state; `drift` compares the
-  current codebase against any saved snapshot and reports new incidents, resolved incidents,
-  regressed files, and a numeric health delta.
-- **Knowledge base**: every successful repair is persisted as a `RepairPattern` in
-  `.aion/knowledge/patterns.json`; confidence boosts derived from historical success rates are
-  applied by the `PolicyEngine` before the auto-repair threshold check, closing the
-  self-evolving feedback loop.
-- **Continuous watch loop**: `watch` polls a target directory on a configurable interval,
-  auto-repairs newly detected incidents, and refreshes the baseline after each successful fix.
-- **Engine status dashboard**: `status` shows all saved snapshots and the full knowledge-base
-  summary in a single view.
-- **Expanded LLM provider support**: Gemini, Azure OpenAI, DeepSeek, and Qwen are now supported
-  alongside Anthropic and OpenAI, with automatic provider auto-detection from available
-  environment variables.
-
-## Next steps
-
-### Phase 5: Production adapters
-
-The next major work is no longer core modeling. It is integration:
-
-- authenticated webhook and queue adapters for real event sources
-- deployment adapters for promotion, rollback, and rollout telemetry
-- provider adapters for WAF, gateway, and feature flag execution
-- approval and audit integration with external systems
-- richer repository test selection instead of only configured command lists
-
-### Phase 6: Product proof before scale
-
-Before adding more adapters, AION should prove it can reliably reduce security
-and operations toil for at least one clear ideal customer profile (ICP). The
-priority is measurable product impact, not feature count.
-
-#### ICP for the next cycle
-
-- Python platform teams maintaining 10-50 services
-- Existing Semgrep and CI usage, but no standardized automated remediation
-- Need for auditable, approval-based rollout due to compliance requirements
-
-#### 90-day execution plan
-
-1. **Weeks 1-4: Reliability hardening**
-   - make deterministic repair + verification pass rate transparent per issue type
-   - reduce false-fix rate with stricter policy thresholds and rollback defaults
-   - ship golden-path examples that run end-to-end in CI
-2. **Weeks 5-8: Integration validation**
-   - deliver one production-ready webhook adapter and one queue adapter
-   - add deployment-system handshake for staged promotion and rollback evidence
-   - validate operational latency from event intake to release recommendation
-3. **Weeks 9-12: Adoption proof**
-   - run 2-3 design partner pilots
-   - capture baseline vs. after metrics for MTTR, manual remediation time, and rollback frequency
-   - publish a public case study and reference architecture
-
-#### Go / no-go scorecard
-
-Continue investing only if these targets are met by the end of the next cycle:
-
-- at least 2 active pilot teams running AION weekly
-- >=30% reduction in median remediation time for supported issue classes
-- <=5% verified false-fix rate on pilot repositories
-- >=90% of auto-approved candidates either advance cleanly or rollback safely
-
-If fewer than 2 of the 4 targets are met, pause expansion and either narrow the
-scope to a single high-performing workflow (for example, deterministic repair +
-verification) or sunset the project.
-
-## Guiding principle
-
-AION is intentionally conservative. Every step favors deterministic artifacts,
-auditable state, and reversible rollout decisions over opaque automation.
+- runtime control-plane features (event queues, webhooks, inbox processing)
+- staged-rollout / release-candidate management
+- runtime containment (WAF, gateway, feature-flag, deploy integrations)
+- in-place hot patching of live production code
+- non-Python languages
