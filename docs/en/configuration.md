@@ -23,7 +23,7 @@ ignore_paths:
 auto_repair_issue_types:
   - raw_sqlite_query
   - hardcoded_secret
-  - missing_auth_decorator
+  - insecure_yaml_load
 auto_repair_min_confidence: 0.90
 sandbox_mode: repository
 sandbox_verification_commands:

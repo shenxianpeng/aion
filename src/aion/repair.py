@@ -53,13 +53,17 @@ class IncidentDetector:
             "remediation_strategy": "env_secret",
             "verification_strategy": ["syntax", "secret_removed", "semgrep"],
         },
+        # Report-only: auto-injecting an auth decorator is unreliable (it cannot
+        # know which decorator is correct, or whether the route is intentionally
+        # public) and previously corrupted real code, so this is surfaced for
+        # human review rather than auto-repaired.
         "missing_auth_decorator": {
-            "issue": "Route handler bypasses the repository's auth decorator pattern.",
+            "issue": "Route handler may be missing the repository's auth decorator pattern.",
             "severity": "high",
             "attack_surface": "http",
-            "recommended_action": "auto_repair",
-            "remediation_strategy": "inject_auth_decorator",
-            "verification_strategy": ["syntax", "auth_decorator_present"],
+            "recommended_action": "review",
+            "remediation_strategy": "",
+            "verification_strategy": ["syntax"],
         },
         "insecure_yaml_load": {
             "issue": "yaml.load without SafeLoader allows arbitrary code execution via deserialization.",
@@ -526,20 +530,8 @@ class PatchPlanner:
                 ],
                 verification_steps=["syntax", "semgrep", "secret_removed"],
             )
-        if incident.issue_type == "missing_auth_decorator":
-            chosen = self._preferred_auth_decorator(context_profile)
-            if not chosen:
-                return None
-            return RemediationPlan(
-                incident_id=incident.id,
-                target_file=incident.target_file,
-                strategy="inject_auth_decorator",
-                summary=f"Insert the repository auth decorator {chosen}.",
-                planned_changes=[
-                    f"Add {chosen} above the route decorator.",
-                ],
-                verification_steps=["syntax", "auth_decorator_present"],
-            )
+        # missing_auth_decorator is intentionally report-only — no deterministic
+        # auto-repair is generated for it (see IncidentDetector._SUPPORTED_INCIDENTS).
         if incident.issue_type == "insecure_yaml_load":
             return RemediationPlan(
                 incident_id=incident.id,
@@ -599,12 +591,6 @@ class PatchPlanner:
                 verification_steps=["syntax", "weak_hash_removed"],
             )
         return None
-
-    def _preferred_auth_decorator(self, context_profile: ContextProfile) -> str | None:
-        decorators = context_profile.auth_decorators
-        if "@require_permissions" in decorators:
-            return "@require_permissions"
-        return decorators[0] if decorators else None
 
 
 class PatchGenerator:
@@ -671,8 +657,6 @@ class PatchGenerator:
             return self._parameterize_sqlite_query(content)
         if plan.strategy == "env_secret":
             return self._replace_hardcoded_secret(content)
-        if plan.strategy == "inject_auth_decorator":
-            return self._inject_auth_decorator(content, context_profile)
         if plan.strategy == "safe_yaml_load":
             return self._fix_yaml_load(content)
         if plan.strategy == "shlex_quote_command":
@@ -718,21 +702,6 @@ class PatchGenerator:
             if content.endswith("\n"):
                 updated += "\n"
         return updated
-
-    def _inject_auth_decorator(self, content: str, context_profile: ContextProfile) -> str:
-        decorator = self.planner._preferred_auth_decorator(context_profile)
-        if not decorator:
-            return content
-        detector = IncidentDetector()
-        insertion_lines = detector._missing_auth_route_lines(content, context_profile)
-        if not insertion_lines:
-            return content
-        lines = content.splitlines()
-        for line_number in sorted(insertion_lines, reverse=True):
-            route_line = lines[line_number - 1]
-            indent = route_line[: len(route_line) - len(route_line.lstrip())]
-            lines.insert(line_number - 1, f"{indent}{decorator}")
-        return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
 
     def _fix_yaml_load(self, content: str) -> str:
         def repl(match: re.Match[str]) -> str:
@@ -922,18 +891,6 @@ class Verifier:
                 )
                 if not passed:
                     reasons.append("Hardcoded secret literal still exists after patching.")
-            elif plan.strategy == "inject_auth_decorator":
-                details = plan.summary.replace("Insert the repository auth decorator ", "").rstrip(".")
-                passed = self._all_route_handlers_have_auth_decorator(tree, details)
-                checks.append(
-                    VerificationCheck(
-                        name="auth_decorator_present",
-                        passed=passed,
-                        details="Selected auth decorator is present in the route declaration.",
-                    )
-                )
-                if not passed:
-                    reasons.append("Auth decorator was not injected into the route declaration.")
             elif plan.strategy == "safe_yaml_load":
                 passed = self._uses_safe_yaml_loader(tree)
                 checks.append(
@@ -1014,19 +971,6 @@ class Verifier:
         if not assignments:
             return False
         return all(self._is_env_lookup(value) for _, value in assignments)
-
-    def _all_route_handlers_have_auth_decorator(self, tree: ast.AST, decorator_name: str) -> bool:
-        expected = decorator_name.lstrip("@").split(".")[-1]
-        route_handlers = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            decorator_names = [self._render_name(decorator) for decorator in node.decorator_list]
-            if any(name in ROUTE_DECORATOR_NAMES for name in decorator_names if name):
-                route_handlers.append(decorator_names)
-        if not route_handlers:
-            return False
-        return all(any(name.split(".")[-1] == expected for name in names if name) for names in route_handlers)
 
     def _uses_safe_yaml_loader(self, tree: ast.AST) -> bool:
         saw_safe_load = False

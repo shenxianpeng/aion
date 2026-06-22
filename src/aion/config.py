@@ -13,7 +13,6 @@ class AppConfig:
     auto_repair_issue_types: list[str] = field(default_factory=lambda: [
         "raw_sqlite_query",
         "hardcoded_secret",
-        "missing_auth_decorator",
         "insecure_yaml_load",
         "command_injection",
     ])

@@ -21,6 +21,20 @@ DEFAULT_EXCLUDES = {
 }
 ORM_IMPORTS = ("sqlalchemy", "django.db", "peewee", "tortoise", "pony", "ormar")
 HTTP_IMPORTS = ("httpx", "requests", "aiohttp", "urllib3")
+# Substrings that mark a decorator as authentication/authorization related.
+# Only decorators whose final name segment contains one of these are treated as
+# the project's auth decorators. Without this filter every decorator in the repo
+# (``@app.callback``, ``@router.get``, ``@pytest.fixture`` …) was misread as an
+# auth decorator, producing false ``missing_auth_decorator`` findings.
+AUTH_DECORATOR_MARKERS = (
+    "auth",
+    "login",
+    "permission",
+    "authenticated",
+    "jwt",
+    "protected",
+    "role",
+)
 LOW_LEVEL_DB_IMPORTS = ("sqlite3", "pymysql", "psycopg2", "mysql.connector", "MySQLdb")
 DB_CALL_PATTERNS = {
     "session.query": "session.query()",
@@ -29,6 +43,12 @@ DB_CALL_PATTERNS = {
     "cursor.execute": "cursor.execute()",
     "Model.objects": "Model.objects",
 }
+
+
+def _is_auth_like_decorator(decorator: str) -> bool:
+    """Return True only for decorators that look like auth/authorization gates."""
+    name = decorator.lstrip("@").split(".")[-1].lower()
+    return any(marker in name for marker in AUTH_DECORATOR_MARKERS)
 
 
 @dataclass
@@ -90,7 +110,7 @@ class ContextExtractor:
                 http_votes[client] = http_votes.get(client, 0) + 1
 
         profile.imports = sorted(import_set)[:50]
-        profile.auth_decorators = sorted(decorator_set)[:20]
+        profile.auth_decorators = sorted(d for d in decorator_set if _is_auth_like_decorator(d))[:20]
         profile.db_patterns = sorted(db_pattern_set)[:20]
         profile.function_names = sorted(function_set)[:30]
         profile.low_level_db_imports = sorted(low_level_set)[:20]
