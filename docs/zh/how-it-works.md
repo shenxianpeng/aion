@@ -1,148 +1,92 @@
 # 工作原理
 
-AION 是一个分阶段控制面。它让同一个仓库从静态分析继续走到修复、验证、事件编排、
-发布控制和运行时防护，而不需要切换核心数据模型。
+AION 只跑一条流水线：**扫描 → 检测 → 修复 → 验证 → 出 PR**。其余功能（漂移检测、
+watch 循环）都复用同一套检测与修复内核。
 
-## 1. 统一输入信号
+## 1. 构建仓库上下文
 
-AION 可以从以下入口开始：
+在判断某处是否有风险之前，AION 先提取一份轻量的仓库画像：
 
-- 对仓库或文件执行 `scan`
-- 单个事件 JSON
-- 事件队列 JSON
-- 文件型 inbox item
-- webhook `POST /events`
-
-这些输入最终都会被统一成结构化 orchestration event。
-
-## 2. 构建仓库上下文
-
-在判断风险前，AION 会先提取一个轻量级仓库画像，包括：
-
-- imports 和主导框架使用习惯
-- 鉴权装饰器
+- import 与主导框架用法
+- 鉴权装饰器（只识别真正像鉴权的那些）
 - 数据库访问模式
 - 函数名
-- 可能采用的 ORM 与 HTTP client 约定
+- 可能的 ORM 和 HTTP 客户端约定
 
-这样它就不只是识别通用规则命中，还能识别“偏离当前仓库惯例”的风险。
+有了上下文，AION 就能把 finding 落到*你的*代码写法上，而不只是通用规则命中。
 
-## 3. 把发现结果提升为 incident
+## 2. 检测问题
 
-检测链路会结合：
+检测结合：
 
-- `semgrep --config p/python`
-- 仓库特定 fallback heuristic
-- 对上下文敏感问题的可选 LLM 解释
+- 安装了 Semgrep 时运行 `semgrep --config p/python`
+- 仓库特定的回退启发式规则
+- 对上下文敏感的 finding 使用可选的 LLM 解释
 
-可执行的问题会被提升为 incident，包含严重级别、置信度、证据、修复策略和验证策略。
+可处理的结果会被升级为 incident，带上严重级别、置信度、证据、修复策略和验证策略。
 
-## 4. 从 incident 生成 patch artifact
+## 3. 生成确定性补丁产物
 
-对于支持的问题类型，AION 会生成确定性 patch artifact，而不是直接改动 live 仓库：
+对支持的问题类型，AION 生成确定性补丁，而不是就地改写仓库。每个产物都包含原始内容、
+补丁内容、统一 diff、所应用的 plan，以及静态校验标记。
 
-- 插值式 `sqlite3` 查询改为参数化调用
-- 硬编码 secret 改为环境变量读取
-- 缺失鉴权装饰器改为注入仓库已有模式
+支持的确定性修复：
 
-artifact 会记录原始内容、修复后内容、diff、plan 和校验状态。
-
-## 5. 在 sandbox 中验证
-
-artifact 会以两种模式之一 staged 到临时工作区：
-
-- `file`：只复制目标文件
-- `repository`：复制整个仓库，并在其中替换目标路径
-
-验证链路会组合：
-
-- Python 语法检查
-- Semgrep 重扫
-- 内建修复断言
-- `sandbox_verification_commands` 中配置的项目级命令
-
-最终会生成 rollout recommendation：
-
-- `approved_for_rollout`
-- `rollback`
-- `needs_human_review`
-
-## 6. 持久化控制面状态
-
-当前实现把状态保存为本地 JSON artifact。
-
-| 状态 | 默认位置 |
+| 问题类型 | 修复方式 |
 |---|---|
-| Inbox 事件 | `.aion/inbox/events/` |
-| Inbox 结果 | `.aion/inbox/results/` |
-| Release candidate | `.aion/releases/` |
-| Repair record | 用户指定的 `--record-path` 或评估目录 |
+| `hardcoded_secret` | 把字面量改为 `os.getenv(...)` |
+| `raw_sqlite_query` | 把 `cursor.execute` 改为参数化调用 |
+| `insecure_yaml_load` | `yaml.load` → `yaml.safe_load` |
+| `command_injection` | 用 `shlex.quote` 包裹 `os.system` f-string 变量 |
+| `subprocess_shell_injection` | 用 `shlex.quote` 包裹 `subprocess(... shell=True)` 变量 |
+| `eval_injection` | `eval(...)` → `ast.literal_eval(...)` |
+| `weak_cryptography` | `hashlib.md5` → `hashlib.sha256` |
 
-这让整个流程更容易审计，也更容易被脚本化系统接管。
+`missing_auth_decorator` 会被检测，但**只报告**——上报给人工，绝不自动打补丁。
 
-## 7. 管理 staged rollout
+## 4. 验证
 
-成功的 sandbox 结果可以继续提升为 release candidate。当前发布状态机支持：
+每个补丁在变成 Pull Request 之前，都必须先通过一道独立的验证门：
 
-- candidate 创建
-- 人工批准
-- canary、staged、broad、full 分阶段推进
-- 拒绝
-- 回滚
+- **语法** —— 补丁内容必须能作为 Python 解析。
+- **断言** —— 用 AST 检查确认*具体的*修复确实生效（例如 `cursor.execute` 现在已参数化、
+  secret 现在已是 `os.getenv` 查找）。这与生成补丁的正则相互独立。
+- **Semgrep 重扫** —— 安装了 Semgrep 时，打补丁后的文件必须重扫干净。
 
-## 8. 规划运行时优先的防护
+判定结果是 `verified_fix`、`unsafe_patch` 或 `needs_human_review` 之一。
+只有 `verified_fix` 才会继续走向 Pull Request。
 
-除了代码修复，AION 还会输出运行时防护计划，例如：
+## 5. 出 PR
 
-- gateway block
-- WAF rule
-- feature flag 变更
-- dependency pin
-- code patch follow-up
+`auto-update` 为每个已验证修复开一个 Pull Request，套用 `.aion.yaml` 中的标签、
+评审者、指派人和目标分支，并遵守 `open_pull_requests_limit`。任何不是已验证修复的内容
+都会留给人工复核，而不会提交。
 
-它的默认倾向是先做 containment，再做代码 rollout。
+## 6. 漂移检测与 watch 循环
 
-## 9. 自我进化循环：漂移检测与持续学习
-
-AION 实现了一个持续自我改进的闭环：
+同一套检测/修复内核驱动持续监控。
 
 ### 漂移检测
 
-`aion snapshot` 在某一时刻捕获安全指纹（文件哈希 + 安全事件 + 健康评分）。
-`aion drift` 将实时状态与该基线对比，识别回退并计算健康变化量。
+`aion snapshot` 在某个时间点捕获安全指纹（文件哈希 + 问题 + 健康分）。`aion drift`
+把当前状态与该基线对比，识别回归并计算健康分变化。
 
 | 状态 | 默认位置 |
 |---|---|
 | 快照 | `.aion/snapshots/` |
 
-健康评分是一个 0.0–1.0 的指标：1.0 表示无已知漏洞；
-数值越低表明事件严重程度和数量相对仓库规模越高。
+健康分是 0.0–1.0 的指标：1.0 表示没有已知问题；分数越低，反映相对仓库规模的问题严重度与数量越高。
 
 ### 知识库
 
-每一次成功修复都会以模式的形式记录到知识库。随着时间推移，引擎会针对每种问题类型
-和修复策略积累历史成功率。这些成功率有两个用途：
+每次修复都会把结果（按问题类型与策略记录成功/失败）写入
+`.aion/knowledge/patterns.json`。`aion status` 会展示这份历史。它是修复表现随时间变化的审计记录。
 
-1. **策略门置信度加成** — 在 `PolicyEngine` 决定某个 incident 是否符合自动 sandbox
-   修复条件之前，它会查询该问题类型的知识库加成并叠加到原始置信度上。因此，历史修复
-   成功率高的已知问题类型，即使初始置信度略低于配置阈值，也可以进入自动修复流程。
-   这正是让 AION 真正实现自我进化的反馈闭环。
-2. **修复执行器指导** — `RepairExecutor` 同样可以使用该加成，在生成 patch artifact
-   时表示更高的确定性。
+### watch 模式
 
-`process-event`、`process-event-queue`、`process-inbox` 和 `watch` 循环都会
-自动从目标仓库根目录的 `.aion/knowledge/patterns.json` 读取并更新知识库。
+`aion watch` 跑外层循环：轮询 → 检测漂移 → 自动修复已验证项 → 记录 → 刷新基线。
 
-| 状态 | 默认位置 |
-|---|---|
-| 修复模式 | `.aion/knowledge/patterns.json` |
+## 7. 边界
 
-### 监控模式
-
-`aion watch` 实现了外层循环：轮询 → 检测漂移 → 自动修复 → 记录 → 刷新基线。
-每次迭代都会利用知识库提升修复置信度。使用 `aion status` 可查看累积的状态。
-
-## 10. 当前边界
-
-当前版本停留在本地控制面决策和持久化 artifact 这一层。真实生产队列、部署系统、
-WAF API、feature flag provider 和自动发布系统，仍然是这些接口之上的适配工作。
+AION 产出补丁产物和 Pull Request。它不会在线热修生产代码，不接入
+WAF/网关/feature-flag/部署系统，也不处理运行时事件流。当前版本只支持 Python。

@@ -1,10 +1,15 @@
 # Usage
 
+AION has eight commands: `scan`, `repair`, `verify`, `auto-update`, `snapshot`,
+`drift`, `watch`, and `status`.
+
 ## Prerequisites
 
-- Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running `scan`
-- Place `.aion.yaml` in the target repository root if you want policy or sandbox defaults
-- Use `--output json` when you want machine-readable artifacts
+- Set at least one LLM provider key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, or `QWEN_API_KEY`) before running `scan`.
+  Deterministic `repair` / `verify` / `auto-update` do **not** require an LLM.
+- Place `.aion.yaml` in the target repository root for auto-update defaults.
+- Use `--output json` when you want machine-readable output.
 
 ## 1. Scan a repository
 
@@ -33,7 +38,7 @@ uv run aion scan ./path/to/project --verbose
 
 ## 2. Generate and verify a repair artifact
 
-Create a deterministic patch artifact and persist the audit trail:
+Create a deterministic patch artifact (no LLM required):
 
 ```bash
 uv run aion repair ./path/to/file.py \
@@ -42,161 +47,18 @@ uv run aion repair ./path/to/file.py \
   --record-path ./repair-record.json
 ```
 
-Verify an existing artifact:
+Verify an existing artifact — syntax check, an AST assertion that the specific
+fix is present, and a Semgrep re-scan when Semgrep is installed:
 
 ```bash
 uv run aion verify --artifact-path ./artifact.json
 ```
 
-Run the full incident flow against a single file:
+A patch is only considered a fix when the verdict is `verified_fix`.
 
-```bash
-uv run aion run-incident ./path/to/file.py \
-  --context-file ./context.json \
-  --record-path ./incident-record.json \
-  --output json
-```
+## 3. Auto-update: scan → verify → open PRs
 
-Evaluate deterministic repair quality across fixtures:
-
-```bash
-uv run aion repair-eval ./tests/fixtures \
-  --records-dir ./repair-records \
-  --output json
-```
-
-## 3. Orchestrate events in a sandbox
-
-Process one event:
-
-```bash
-uv run aion process-event ./event.json \
-  --result-path ./orchestration.json \
-  --output json
-```
-
-Process a JSON array of events:
-
-```bash
-uv run aion process-event-queue ./events.json \
-  --results-dir ./queue-results \
-  --output json
-```
-
-Typical event payload:
-
-```json
-{
-  "event_id": "runtime-001",
-  "event_type": "runtime_alert",
-  "target_file": "/absolute/path/to/service.py",
-  "metadata": {
-    "repo_root": "/absolute/path/to/repo",
-    "context_file": "/absolute/path/to/context.json"
-  }
-}
-```
-
-Supported event types in the current release:
-
-- `code_scan`
-- `runtime_alert`
-- `dependency_alert`
-
-## 4. Use the persistent inbox and webhook
-
-Enqueue an event into the file-backed inbox:
-
-```bash
-uv run aion enqueue-event ./event.json \
-  --inbox-root ./.aion/inbox
-```
-
-Inspect pending or processed items:
-
-```bash
-uv run aion list-inbox \
-  --inbox-root ./.aion/inbox \
-  --status pending
-```
-
-Process everything currently pending:
-
-```bash
-uv run aion process-inbox \
-  --inbox-root ./.aion/inbox \
-  --output json
-```
-
-Start the webhook receiver:
-
-```bash
-uv run aion serve-webhook \
-  --inbox-root ./.aion/inbox \
-  --host 127.0.0.1 \
-  --port 8080
-```
-
-The webhook accepts `POST /events` and writes accepted payloads into the inbox.
-
-## 5. Manage staged rollout
-
-Create a release candidate from a successful orchestration result:
-
-```bash
-uv run aion create-release-candidate ./.aion/inbox/results/<event>.json \
-  --releases-root ./.aion/releases
-```
-
-Inspect current candidates:
-
-```bash
-uv run aion list-releases --releases-root ./.aion/releases
-```
-
-Approve and advance through phases:
-
-```bash
-uv run aion approve-release <candidate-id> \
-  --approver alice \
-  --releases-root ./.aion/releases
-
-uv run aion advance-release <candidate-id> \
-  --releases-root ./.aion/releases
-```
-
-Reject or roll back:
-
-```bash
-uv run aion reject-release <candidate-id> \
-  --approver alice \
-  --reason "review failed" \
-  --releases-root ./.aion/releases
-
-uv run aion rollback-release <candidate-id> \
-  --reason "failed canary metrics" \
-  --releases-root ./.aion/releases
-```
-
-## 6. Plan runtime defense actions
-
-Generate containment recommendations from an orchestration result:
-
-```bash
-uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
-```
-
-The current defense planner can emit:
-
-- gateway blocks
-- WAF rules
-- feature flag actions
-- dependency pin recommendations
-- code-patch follow-up actions
-
-## 7. Auto-Update
-
-Run the full scan → fix → PR pipeline:
+Run the full pipeline:
 
 ```bash
 uv run aion auto-update --target ./
@@ -210,26 +72,16 @@ uv run aion auto-update --target ./ --dry-run
 
 The `auto-update` command:
 
-1. Reads `.aion.yaml` for scheduling, policy, and PR configuration
-2. Scans all Python files for security incidents
-3. Generates deterministic patches for supported issue types
-4. Verifies each patch in an isolated workspace
-5. Creates a pull request for each verified fix
-6. Respects `open_pull_requests_limit` to avoid PR floods
+1. Reads `.aion.yaml` for provider and PR configuration.
+2. Scans all Python files for security incidents.
+3. Generates deterministic patches for supported issue types.
+4. Verifies each patch in an isolated workspace.
+5. Opens a pull request for each **verified** fix.
+6. Respects `open_pull_requests_limit` to avoid PR floods.
 
 ### GitHub Action
 
-AION ships with a reusable GitHub Action (`action.yml`). Add to your workflow:
-
-```yaml
-- uses: shenxianpeng/aion@main
-  with:
-    target: '.'
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-```
-
-Or schedule it with GitHub Actions:
+AION ships with a reusable GitHub Action (`action.yml`). Add it to a workflow:
 
 ```yaml
 name: AION Auto-Update
@@ -247,14 +99,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: shenxianpeng/aion@main
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-## 8. Track security drift and evolution
+## 4. Supported issue types
+
+`scan` can surface many findings, but only these are turned into deterministic,
+verified auto-fixes:
+
+| Issue type | Fix |
+|---|---|
+| `hardcoded_secret` | move the literal to `os.getenv(...)` |
+| `raw_sqlite_query` | parameterize the `cursor.execute` call |
+| `insecure_yaml_load` | `yaml.load` → `yaml.safe_load` |
+| `command_injection` | wrap `os.system` f-string vars in `shlex.quote` |
+| `subprocess_shell_injection` | wrap `subprocess(... shell=True)` vars in `shlex.quote` |
+| `eval_injection` | `eval(...)` → `ast.literal_eval(...)` |
+| `weak_cryptography` | `hashlib.md5` → `hashlib.sha256` |
+
+`missing_auth_decorator` is **report-only**: a missing auth gate is surfaced for
+a human, but never auto-injected, because AION cannot know which decorator is
+correct or whether a route is intentionally public.
+
+## 5. Track security drift
 
 ### Save a security baseline
-
-Capture the current security state of your repository:
 
 ```bash
 uv run aion snapshot ./src --name baseline
@@ -266,32 +139,25 @@ posture.
 
 ### Check for drift
 
-Compare the current state against a saved snapshot to detect regressions:
-
 ```bash
 uv run aion drift ./src --name baseline
 ```
 
-Exit code `0` means no regression. Exit code `1` means new incidents were found.
-Use `--output json` to get a machine-readable drift report for CI integration.
+Exit code `0` means no regression; exit code `1` means new incidents were found.
+Use `--output json` for a machine-readable drift report in CI.
 
 ### Continuous watch mode
-
-Monitor a directory for security drift and auto-repair new incidents as they appear:
 
 ```bash
 uv run aion watch ./src --interval 30 --auto-repair
 ```
 
 AION polls every `--interval` seconds, compares against the last known-good
-baseline, and automatically generates and verifies patches for any new incidents.
-When a repair reaches `verified_fix`, `watch` writes the patched content back to
-the watched local file and refreshes the baseline. Each successful repair is
-recorded in the knowledge base so future runs improve.
+baseline, and generates and verifies patches for new incidents. When a repair
+reaches `verified_fix`, `watch` writes the patched content back to the watched
+local file and refreshes the baseline.
 
-### Inspect engine health and learned patterns
-
-Show accumulated snapshots and knowledge-base repair patterns:
+### Inspect engine health
 
 ```bash
 uv run aion status
@@ -299,10 +165,15 @@ uv run aion status
 uv run aion status --aion-dir ./.aion --output json
 ```
 
-## 9. Operational notes
+`status` shows accumulated snapshots and the repair knowledge base (per
+issue-type success/failure history recorded by repairs).
 
-- The current release emits patch artifacts and `watch` can rewrite watched local files after verification; it does not rewrite live production files in place.
-- `sandbox_verification_commands` run inside the staged workspace, not inside your working tree.
-- `process-event` and inbox processing automatically load `.aion.yaml` from the event repository root.
-- `repair-eval` reports repair success rate, verification pass rate, false-fix rate, and rollback rate.
-- Drift snapshots and knowledge-base patterns are persisted in `.aion/` and survive restarts.
+## 6. Operational notes
+
+- AION emits patch artifacts and pull requests; `watch` can rewrite watched local
+  files after verification. It does not rewrite live production files in place.
+- Deterministic `repair`, `verify`, and `auto-update` do not require an LLM; only
+  `scan`'s explanations do.
+- Drift snapshots and knowledge-base history are persisted under `.aion/` and
+  survive restarts.
+- Context extraction results are cached at `~/.aion-context.json`.

@@ -1,10 +1,15 @@
 # 使用
 
+AION 共有八个命令：`scan`、`repair`、`verify`、`auto-update`、`snapshot`、
+`drift`、`watch`、`status`。
+
 ## 前置条件
 
-- 运行 `scan` 前先设置 `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`DEEPSEEK_API_KEY` 或 `QWEN_API_KEY`
-- 如果希望统一策略和 sandbox 默认值，请在目标仓库根目录放置 `.aion.yaml`
-- 需要机器可读输出时使用 `--output json`
+- 运行 `scan` 前至少设置一个 LLM 提供方密钥（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、
+  `GEMINI_API_KEY`、`DEEPSEEK_API_KEY` 或 `QWEN_API_KEY`）。确定性的
+  `repair` / `verify` / `auto-update` **不需要** LLM。
+- 如需 auto-update 默认配置，把 `.aion.yaml` 放在目标仓库根目录。
+- 需要机器可读输出时使用 `--output json`。
 
 ## 1. 扫描仓库
 
@@ -12,28 +17,28 @@
 uv run aion scan ./path/to/project
 ```
 
-只扫描你已经确认是 AI 生成的文件：
+只扫描你已知是 AI 生成的文件：
 
 ```bash
 uv run aion scan ./path/to/project \
   --ai-generated ./path/to/project/generated_file.py
 ```
 
-切换 provider 或输出 JSON：
+切换提供方或输出 JSON：
 
 ```bash
 uv run aion scan ./path/to/project --provider openai --output json
 ```
 
-输出上下文提取、fallback 原因和 Semgrep 细节：
+打印提取出的上下文、回退原因和 Semgrep 细节：
 
 ```bash
 uv run aion scan ./path/to/project --verbose
 ```
 
-## 2. 生成并验证修复 artifact
+## 2. 生成并验证修复产物
 
-创建确定性 patch artifact，并把审计记录一起落盘：
+生成确定性补丁产物（不需要 LLM）：
 
 ```bash
 uv run aion repair ./path/to/file.py \
@@ -42,167 +47,24 @@ uv run aion repair ./path/to/file.py \
   --record-path ./repair-record.json
 ```
 
-验证已有 artifact：
+验证已有产物——语法检查、断言修复确实生效的 AST 检查、以及（安装了 Semgrep 时的）
+Semgrep 重扫：
 
 ```bash
 uv run aion verify --artifact-path ./artifact.json
 ```
 
-对单个文件运行完整 incident 流程：
+只有判定为 `verified_fix` 才算修复成功。
 
-```bash
-uv run aion run-incident ./path/to/file.py \
-  --context-file ./context.json \
-  --record-path ./incident-record.json \
-  --output json
-```
+## 3. Auto-update：扫描 → 验证 → 开 PR
 
-在 fixture 上评估确定性修复质量：
-
-```bash
-uv run aion repair-eval ./tests/fixtures \
-  --records-dir ./repair-records \
-  --output json
-```
-
-## 3. 在 sandbox 中编排事件
-
-处理单个事件：
-
-```bash
-uv run aion process-event ./event.json \
-  --result-path ./orchestration.json \
-  --output json
-```
-
-批量处理事件数组：
-
-```bash
-uv run aion process-event-queue ./events.json \
-  --results-dir ./queue-results \
-  --output json
-```
-
-典型事件 payload：
-
-```json
-{
-  "event_id": "runtime-001",
-  "event_type": "runtime_alert",
-  "target_file": "/absolute/path/to/service.py",
-  "metadata": {
-    "repo_root": "/absolute/path/to/repo",
-    "context_file": "/absolute/path/to/context.json"
-  }
-}
-```
-
-当前版本支持的事件类型：
-
-- `code_scan`
-- `runtime_alert`
-- `dependency_alert`
-
-## 4. 使用持久化 inbox 和 webhook
-
-把事件写入文件型 inbox：
-
-```bash
-uv run aion enqueue-event ./event.json \
-  --inbox-root ./.aion/inbox
-```
-
-查看待处理或已处理事件：
-
-```bash
-uv run aion list-inbox \
-  --inbox-root ./.aion/inbox \
-  --status pending
-```
-
-处理当前所有 pending 事件：
-
-```bash
-uv run aion process-inbox \
-  --inbox-root ./.aion/inbox \
-  --output json
-```
-
-启动 webhook 接收器：
-
-```bash
-uv run aion serve-webhook \
-  --inbox-root ./.aion/inbox \
-  --host 127.0.0.1 \
-  --port 8080
-```
-
-webhook 会接收 `POST /events`，并把合法 payload 写入 inbox。
-
-## 5. 管理 staged rollout
-
-从成功的 orchestration result 创建 release candidate：
-
-```bash
-uv run aion create-release-candidate ./.aion/inbox/results/<event>.json \
-  --releases-root ./.aion/releases
-```
-
-查看当前 candidate：
-
-```bash
-uv run aion list-releases --releases-root ./.aion/releases
-```
-
-批准并向下一阶段推进：
-
-```bash
-uv run aion approve-release <candidate-id> \
-  --approver alice \
-  --releases-root ./.aion/releases
-
-uv run aion advance-release <candidate-id> \
-  --releases-root ./.aion/releases
-```
-
-拒绝或回滚：
-
-```bash
-uv run aion reject-release <candidate-id> \
-  --approver alice \
-  --reason "review failed" \
-  --releases-root ./.aion/releases
-
-uv run aion rollback-release <candidate-id> \
-  --reason "failed canary metrics" \
-  --releases-root ./.aion/releases
-```
-
-## 6. 规划运行时防护动作
-
-基于 orchestration result 生成运行时防护建议：
-
-```bash
-uv run aion plan-defense ./.aion/inbox/results/<event>.json --output json
-```
-
-当前 defense planner 可输出：
-
-- gateway block
-- WAF rule
-- feature flag 动作
-- dependency pin 建议
-- code patch follow-up 动作
-
-## 7. 自动更新
-
-运行完整的扫描 → 修复 → PR 流程：
+运行完整流程：
 
 ```bash
 uv run aion auto-update --target ./
 ```
 
-Dry-run 预览将要执行的操作，但不创建 PR：
+干跑（dry-run），查看会发生什么但不创建 PR：
 
 ```bash
 uv run aion auto-update --target ./ --dry-run
@@ -210,32 +72,22 @@ uv run aion auto-update --target ./ --dry-run
 
 `auto-update` 命令会：
 
-1. 读取 `.aion.yaml` 中的调度、策略和 PR 配置
-2. 扫描所有 Python 文件中的安全事件
-3. 为支持的问题类型生成确定性 patch
-4. 在隔离工作区中验证每个 patch
-5. 为每个已验证的修复创建 pull request
-6. 遵守 `open_pull_requests_limit` 以避免 PR 洪水
+1. 读取 `.aion.yaml` 中的提供方与 PR 配置。
+2. 扫描所有 Python 文件中的安全问题。
+3. 为支持的问题类型生成确定性补丁。
+4. 在隔离工作区中验证每个补丁。
+5. 为每个**已验证**的修复开 Pull Request。
+6. 遵守 `open_pull_requests_limit`，避免 PR 泛滥。
 
 ### GitHub Action
 
-AION 提供了可复用的 GitHub Action（`action.yml`）。在你的 workflow 中添加：
-
-```yaml
-- uses: shenxianpeng/aion@main
-  with:
-    target: '.'
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-```
-
-或用 GitHub Actions 定时调度：
+AION 自带可复用的 GitHub Action（`action.yml`）。加入工作流：
 
 ```yaml
 name: AION Auto-Update
 on:
   schedule:
-    - cron: '0 9 * * 1'  # 每周一早 09:00 UTC
+    - cron: '0 9 * * 1'  # 每周一 09:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -247,49 +99,60 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: shenxianpeng/aion@main
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-## 8. 追踪安全漂移与系统演进
+## 4. 支持的问题类型
 
-### 保存安全基线快照
+`scan` 能报出很多 finding，但只有下面这些会被转成确定性、可验证的自动修复：
 
-捕获仓库当前的安全状态：
+| 问题类型 | 修复方式 |
+|---|---|
+| `hardcoded_secret` | 把字面量改为 `os.getenv(...)` |
+| `raw_sqlite_query` | 把 `cursor.execute` 改为参数化调用 |
+| `insecure_yaml_load` | `yaml.load` → `yaml.safe_load` |
+| `command_injection` | 用 `shlex.quote` 包裹 `os.system` f-string 变量 |
+| `subprocess_shell_injection` | 用 `shlex.quote` 包裹 `subprocess(... shell=True)` 变量 |
+| `eval_injection` | `eval(...)` → `ast.literal_eval(...)` |
+| `weak_cryptography` | `hashlib.md5` → `hashlib.sha256` |
+
+`missing_auth_decorator` 是**只报告**：缺失鉴权会上报给人工，但绝不自动注入——
+因为 AION 无法判断哪个装饰器才正确，也无法判断该路由是否本就有意公开。
+
+## 5. 跟踪安全漂移
+
+### 保存安全基线
 
 ```bash
 uv run aion snapshot ./src --name baseline
 ```
 
-命令会生成 `.aion/snapshots/baseline.json`，其中包含健康评分、事件列表和文件哈希——
-即仓库安全态势的可复现指纹。
+这会生成 `.aion/snapshots/baseline.json`，包含健康分、问题列表和文件哈希——
+仓库安全状态的可复现指纹。
 
-### 检查安全漂移
-
-将当前状态与已保存的快照对比，检测是否出现安全回退：
+### 检测漂移
 
 ```bash
 uv run aion drift ./src --name baseline
 ```
 
-退出码 `0` 表示没有回退，退出码 `1` 表示发现了新的安全事件。
-使用 `--output json` 可获取机器可读的漂移报告，便于 CI 集成。
+退出码 `0` 表示无回归；退出码 `1` 表示发现新问题。在 CI 中可用 `--output json`
+获取机器可读的漂移报告。
 
-### 持续监控模式
-
-监控目录并在发现安全漂移时自动修复：
+### 持续 watch 模式
 
 ```bash
 uv run aion watch ./src --interval 30 --auto-repair
 ```
 
-AION 每隔 `--interval` 秒轮询一次，将当前状态与上一个已知好的基线对比，
-并自动生成和验证新事件的修复补丁。当修复达到 `verified_fix` 时，
-`watch` 会把补丁内容写回被监控的本地文件，并刷新基线。每次成功修复都会记录到知识库，
-使后续修复持续改进。
+AION 每隔 `--interval` 秒轮询一次，与上一个已知良好基线对比，为新问题生成并验证补丁。
+当修复达到 `verified_fix` 时，`watch` 会把补丁写回被监视的本地文件并刷新基线。
 
-### 查看引擎健康状态和已学习的修复模式
-
-显示已保存的快照和知识库中的修复模式：
+### 查看引擎健康
 
 ```bash
 uv run aion status
@@ -297,10 +160,12 @@ uv run aion status
 uv run aion status --aion-dir ./.aion --output json
 ```
 
-## 9. 运行说明
+`status` 展示累积的快照和修复知识库（修复过程中记录的每种问题类型的成功/失败历史）。
 
-- 当前版本会生成 patch artifact；`watch` 仅会在验证通过后改写被监控的本地文件，不会直接原地改写生产环境文件。
-- `sandbox_verification_commands` 只会在 staged workspace 中执行，不会在你的工作树里直接运行。
-- `process-event` 和 inbox 处理会自动从事件仓库根目录加载 `.aion.yaml`。
-- `repair-eval` 会输出修复成功率、验证通过率、误修率和回滚率。
-- 漂移快照和知识库模式持久化在 `.aion/` 目录，服务重启后仍然保留。
+## 6. 运维说明
+
+- AION 产出补丁产物和 Pull Request；`watch` 在验证后可改写被监视的本地文件，
+  但不会就地改写线上生产文件。
+- 确定性的 `repair`、`verify`、`auto-update` 不需要 LLM；只有 `scan` 的解释需要。
+- 漂移快照和知识库历史持久化在 `.aion/` 下，重启后仍保留。
+- 上下文提取结果缓存在 `~/.aion-context.json`。
