@@ -1,18 +1,10 @@
-name: Draft Release Notes
+name: Release Drafter
 
 on:
   push:
     branches:
-      - main
+      - "main"
   workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: read
-
-concurrency:
-  group: draft-release-notes
-  cancel-in-progress: true
 
 jobs:
   update_release_draft:
@@ -21,87 +13,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
-
-      - name: Install git-cliff
-        uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9  # v2.82.2
+      # Draft your next Release notes as Pull Requests are merged into the default branch
+      - uses: release-drafter/release-drafter@v7
         with:
-          tool: git-cliff
-
-      - name: Determine next version
-        id: version
-        shell: bash
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          version="$(git-cliff --config cliff.toml --bumped-version)"
-          version="$(tr -d '[:space:]' <<< "$version")"
-          if [[ -z "$version" ]]; then
-            echo "git-cliff did not return a bumped version" >&2
-            exit 1
-          fi
-
-          if [[ "$version" != v* ]]; then
-            version="v${version}"
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Generate release notes
-        shell: bash
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          git-cliff \
-            --config cliff.toml \
-            --unreleased \
-            --tag "$RELEASE_TAG" \
-            --strip header \
-            --output RELEASE_NOTES.md \
-            --verbose
-
-      - name: Upsert draft release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          draft_id="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases" \
-              --jq 'map(select(.draft == true)) | sort_by(.created_at) | last | .id // ""'
-          )"
-
-          if [[ -n "$draft_id" ]]; then
-            jq -n \
-              --arg tag_name "$RELEASE_TAG" \
-              --arg target_commitish "$GITHUB_SHA" \
-              --arg name "$RELEASE_TAG" \
-              --rawfile body RELEASE_NOTES.md \
-              '{
-                tag_name: $tag_name,
-                target_commitish: $target_commitish,
-                name: $name,
-                body: $body,
-                draft: true,
-                prerelease: false
-              }' > release-payload.json
-
-            gh api \
-              --method PATCH \
-              "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
-              --input release-payload.json
-          else
-            gh release create "$RELEASE_TAG" \
-              --draft \
-              --title "$RELEASE_TAG" \
-              --target "${GITHUB_SHA}" \
-              --notes-file RELEASE_NOTES.md
-          fi
+          config-name: github:shenxianpeng/.github:/.github/release-drafter.yml
