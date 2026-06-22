@@ -591,19 +591,20 @@
 
 <div class="aion-home">
   <section class="aion-home__hero">
-    <div class="aion-home__eyebrow">autonomous software civilization</div>
+    <div class="aion-home__eyebrow">verified security auto-fixes for python</div>
     <h1 class="aion-home__title">
-      Build code that refuses to decay.
-      <span>Operate software as a living system.</span>
+      Scan Python repos.
+      <span>Open security fixes you can trust.</span>
     </h1>
     <p class="aion-home__lede">
-      AION is the control plane for code immortality. It detects structural drift,
-      synthesizes deterministic repairs, verifies them in isolation, and prepares
-      rollout plus runtime containment before a hotfix becomes human toil.
+      AION scans a Python repository for a focused set of high-confidence
+      security issues, generates a deterministic patch for each one, verifies it
+      in isolation, and opens a pull request only for fixes that pass. If a fix
+      can't be proven safe, it is reported for review instead of touching your code.
     </p>
     <div class="aion-home__actions">
-      <a class="md-button md-button--primary" href="usage/">Start the loop</a>
-      <a class="md-button" href="how-it-works/">See the architecture</a>
+      <a class="md-button md-button--primary" href="usage/">Get started</a>
+      <a class="md-button" href="how-it-works/">See how it works</a>
     </div>
     <div class="aion-home__signal-grid">
       <div class="aion-signal-card">
@@ -612,60 +613,60 @@
       </div>
       <div class="aion-signal-card">
         <div class="aion-signal-card__label">Repair</div>
-        <div class="aion-signal-card__value">Deterministic Patch Artifacts</div>
+        <div class="aion-signal-card__value">Deterministic Patches</div>
       </div>
       <div class="aion-signal-card">
         <div class="aion-signal-card__label">Verify</div>
-        <div class="aion-signal-card__value">Sandbox + Project Commands</div>
+        <div class="aion-signal-card__value">Syntax + AST + Semgrep</div>
       </div>
       <div class="aion-signal-card">
-        <div class="aion-signal-card__label">Defend</div>
-        <div class="aion-signal-card__value">Release + Containment Decisions</div>
+        <div class="aion-signal-card__label">Ship</div>
+        <div class="aion-signal-card__value">Verified Pull Requests</div>
       </div>
     </div>
   </section>
 
   <section class="aion-home__manifesto">
     <p>
-      The goal is not faster maintenance. The goal is to end maintenance as a
-      default human activity.
+      Intentionally small. The goal is a tool you can trust to run unattended on
+      your repository — not a platform you have to operate.
     </p>
   </section>
 
   <section class="aion-card-grid">
     <article class="aion-panel">
-      <h2>What ships now</h2>
+      <h2>What it does</h2>
       <ul>
         <li>Context-aware Python scanning with repository profiling and Semgrep triage</li>
-        <li>Deterministic remediation for raw SQLite interpolation, secrets, and auth drift</li>
-        <li>Sandbox verification with assertions, Semgrep re-scan, and project commands</li>
-        <li>Inbox, queue, webhook, release, rollback, and defense planning control-plane flows</li>
+        <li>Deterministic patches for secrets, raw SQL, unsafe YAML/eval, shell injection, and weak hashing</li>
+        <li>A verification gate: every patch must parse, satisfy an AST assertion, and survive a Semgrep re-scan</li>
+        <li>Pull requests opened only for fixes that reach <code>verified_fix</code></li>
       </ul>
     </article>
     <article class="aion-panel">
-      <h2>Operating model</h2>
+      <h2>How it works</h2>
       <ol>
-        <li>Ingest a repository scan or runtime event.</li>
-        <li>Upgrade findings into incidents and remediation plans.</li>
-        <li>Emit a patch artifact instead of mutating the live repository.</li>
-        <li>Verify the artifact inside a file or repository sandbox.</li>
-        <li>Persist the result as orchestration state and rollout intent.</li>
+        <li>Profile the repository (ORM, auth, DB patterns) for context.</li>
+        <li>Detect incidents with Semgrep, heuristics, and optional LLM.</li>
+        <li>Generate a deterministic patch artifact for supported issue types.</li>
+        <li>Verify the patch in isolation.</li>
+        <li>Open a PR for each verified fix; report the rest for review.</li>
       </ol>
     </article>
     <article class="aion-panel">
-      <h2>What AION is for</h2>
+      <h2>What it's for</h2>
       <ul>
-        <li>Evaluating AI-generated code against repository-specific conventions</li>
-        <li>Prototyping autonomous repair loops with policy gates</li>
-        <li>Building auditable remediation records for future production adapters</li>
+        <li>Auto-remediating high-confidence security issues in Python services</li>
+        <li>Reviewing AI-generated code against repository-specific conventions</li>
+        <li>Detecting security drift over time with snapshots and a watch loop</li>
       </ul>
     </article>
     <article class="aion-panel">
-      <h2>Current boundary</h2>
+      <h2>What it does not do</h2>
       <ul>
-        <li>No in-place production hot patching</li>
-        <li>No direct push into external deploy, WAF, or feature-flag systems</li>
-        <li>Python-only in the current release</li>
+        <li>No in-place production hot patching; it produces patches and PRs</li>
+        <li>Not a runtime control plane — no WAF, gateway, or deploy integration</li>
+        <li>Python-only by design</li>
       </ul>
     </article>
   </section>

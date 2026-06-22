@@ -535,7 +535,7 @@
   <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        扁平配置格式
+        示例
       
     </span>
   </a>
@@ -546,19 +546,19 @@
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        字段说明
+        字段
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="字段说明">
+    <nav class="md-nav" aria-label="字段">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        核心字段
+        扫描
       
     </span>
   </a>
@@ -566,10 +566,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#auto-updatepull-request" class="md-nav__link">
     <span class="md-ellipsis">
       
-        自动更新字段
+        Auto-update（Pull Request）
       
     </span>
   </a>
@@ -582,7 +582,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支持的 LLM 提供方
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         解析规则
@@ -593,21 +604,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        推荐配置档位
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        运行说明
+        运维说明
       
     </span>
   </a>
@@ -706,7 +706,7 @@
   <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        扁平配置格式
+        示例
       
     </span>
   </a>
@@ -717,19 +717,19 @@
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        字段说明
+        字段
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="字段说明">
+    <nav class="md-nav" aria-label="字段">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        核心字段
+        扫描
       
     </span>
   </a>
@@ -737,10 +737,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#auto-updatepull-request" class="md-nav__link">
     <span class="md-ellipsis">
       
-        自动更新字段
+        Auto-update（Pull Request）
       
     </span>
   </a>
@@ -753,7 +753,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支持的 LLM 提供方
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         解析规则
@@ -764,21 +775,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        推荐配置档位
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        运行说明
+        运维说明
       
     </span>
   </a>
@@ -806,44 +806,28 @@
 
 
 <h1 id="_1">配置<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>在目标仓库根目录放置 <code>.aion.yaml</code>。AION 用它控制仓库扫描默认值、编排命令，以及自动更新工作流。</p>
-<p>AION 使用扁平配置格式。<code>schedule</code>、<code>open_pull_requests_limit</code> 和
-<code>labels</code> 等自动更新字段直接配置在顶层。</p>
-<h2 id="_2">扁平配置格式<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<div class="language-yaml highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">directory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">schedule</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;weekly&quot;</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">day</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;monday&quot;</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">time</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;09:00&quot;</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">timezone</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Asia/Shanghai&quot;</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-4.1</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nt">ignore_paths</span><span class="p">:</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/*</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scripts/generated_*.py</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">auto_repair_issue_types</span><span class="p">:</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_sqlite_query</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hardcoded_secret</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insecure_yaml_load</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nt">auto_repair_min_confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.90</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">sandbox_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repository</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="nt">sandbox_verification_commands</span><span class="p">:</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python -m pytest tests/unit</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="nt">auto_approve_verified_fixes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="nt">rollback_on_verification_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="nt">open_pull_requests_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;aion&quot;</span>
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;security&quot;</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="nt">reviewers</span><span class="p">:</span>
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;team:security&quot;</span>
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="nt">assignees</span><span class="p">:</span>
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;username&quot;</span>
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="nt">target_branch</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;main&quot;</span>
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="nt">commit_message_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[AION]&quot;</span>
+<p>在目标仓库根目录放置 <code>.aion.yaml</code>。AION 用它控制扫描默认值和 <code>auto-update</code> 的
+Pull Request 工作流。配置采用扁平格式。</p>
+<h2 id="_2">示例<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<div class="language-yaml highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-4.1</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">ignore_paths</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/*</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scripts/generated_*.py</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nt">open_pull_requests_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;aion&quot;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;security&quot;</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">reviewers</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;team:security&quot;</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">assignees</span><span class="p">:</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;username&quot;</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="nt">target_branch</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;main&quot;</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">commit_message_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[AION]&quot;</span>
 </code></pre></div>
-<h2 id="_3">字段说明<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<h3 id="_4">核心字段<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>命令行参数会覆盖 <code>.aion.yaml</code> 中对应的配置。</p>
+<h2 id="_3">字段<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<h3 id="_4">扫描<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -858,59 +842,23 @@
 <td><code>provider</code></td>
 <td>string</td>
 <td><code>null</code></td>
-<td><code>scan</code> 阶段使用的 LLM 提供方，支持 <code>anthropic</code>、<code>openai</code>、<code>deepseek</code> 或 <code>qwen</code></td>
+<td>扫描时的 LLM 提供方：<code>anthropic</code>、<code>openai</code>、<code>gemini</code>、<code>azure</code>、<code>deepseek</code> 或 <code>qwen</code></td>
 </tr>
 <tr>
 <td><code>model</code></td>
 <td>string</td>
-<td>provider 默认值</td>
+<td>提供方默认</td>
 <td><code>scan</code> 的显式模型覆盖</td>
 </tr>
 <tr>
 <td><code>ignore_paths</code></td>
 <td>list</td>
 <td><code>[]</code></td>
-<td>仓库扫描时跳过的 glob 模式</td>
-</tr>
-<tr>
-<td><code>auto_repair_issue_types</code></td>
-<td>list</td>
-<td>内建集合</td>
-<td>允许进入自动 sandbox 修复的 incident 类型</td>
-</tr>
-<tr>
-<td><code>auto_repair_min_confidence</code></td>
-<td>float</td>
-<td><code>0.85</code></td>
-<td>触发自动修复所需的最小 incident 置信度</td>
-</tr>
-<tr>
-<td><code>sandbox_mode</code></td>
-<td>string</td>
-<td><code>repository</code></td>
-<td><code>file</code> 为单文件 staging，<code>repository</code> 为整仓 staging</td>
-</tr>
-<tr>
-<td><code>sandbox_verification_commands</code></td>
-<td>list</td>
-<td><code>[]</code></td>
-<td>在 staged sandbox 内执行的项目级命令</td>
-</tr>
-<tr>
-<td><code>auto_approve_verified_fixes</code></td>
-<td>boolean</td>
-<td><code>false</code></td>
-<td>staged 验证通过时直接给出 <code>approved_for_rollout</code></td>
-</tr>
-<tr>
-<td><code>rollback_on_verification_failure</code></td>
-<td>boolean</td>
-<td><code>true</code></td>
-<td>staged 验证失败时给出 <code>rollback</code>，而不是 <code>needs_human_review</code></td>
+<td>扫描时跳过的 glob 模式</td>
 </tr>
 </tbody>
 </table>
-<h3 id="_5">自动更新字段<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<h3 id="auto-updatepull-request">Auto-update（Pull Request）<a class="headerlink" href="#auto-updatepull-request" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -925,92 +873,100 @@
 <td><code>directory</code></td>
 <td>string</td>
 <td><code>/</code></td>
-<td>操作的相对目录</td>
-</tr>
-<tr>
-<td><code>schedule.interval</code></td>
-<td>string</td>
-<td><code>weekly</code></td>
-<td><code>daily</code>、<code>weekly</code> 或 <code>monthly</code>（供参考；AION 本身按需运行）</td>
-</tr>
-<tr>
-<td><code>schedule.day</code></td>
-<td>string</td>
-<td><code>monday</code></td>
-<td><code>weekly</code> 间隔对应的星期</td>
-</tr>
-<tr>
-<td><code>schedule.time</code></td>
-<td>string</td>
-<td><code>09:00</code></td>
-<td>时间（24 小时制）</td>
-</tr>
-<tr>
-<td><code>schedule.timezone</code></td>
-<td>string</td>
-<td><code>UTC</code></td>
-<td>调度时区</td>
+<td>要处理的相对目录</td>
 </tr>
 <tr>
 <td><code>open_pull_requests_limit</code></td>
 <td>integer</td>
 <td><code>5</code></td>
-<td>最大并发打开的 AION PR 数</td>
+<td>AION 同时打开的最大 PR 数</td>
 </tr>
 <tr>
 <td><code>labels</code></td>
 <td>list</td>
 <td><code>[]</code></td>
-<td>自动创建的 PR 上打的标签</td>
+<td>自动创建的 PR 上加的标签</td>
 </tr>
 <tr>
 <td><code>reviewers</code></td>
 <td>list</td>
 <td><code>[]</code></td>
-<td>自动创建的 PR 上请求的评审人</td>
+<td>自动创建的 PR 上请求的评审者</td>
 </tr>
 <tr>
 <td><code>assignees</code></td>
 <td>list</td>
 <td><code>[]</code></td>
-<td>自动创建的 PR 的负责人</td>
+<td>自动创建的 PR 的指派人</td>
 </tr>
 <tr>
 <td><code>target_branch</code></td>
 <td>string</td>
 <td><code>main</code></td>
-<td>自动创建的 PR 的目标分支</td>
+<td>自动创建的 PR 的基础分支</td>
 </tr>
 <tr>
 <td><code>commit_message_prefix</code></td>
 <td>string</td>
 <td><code>[AION]</code></td>
-<td>提交信息前缀</td>
+<td>提交信息和 PR 标题的前缀</td>
 </tr>
 </tbody>
 </table>
-<h2 id="_6">解析规则<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="llm">支持的 LLM 提供方<a class="headerlink" href="#llm" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>提供方</th>
+<th>环境变量</th>
+<th>默认模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Anthropic</td>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td><code>claude-3-5-sonnet-latest</code></td>
+</tr>
+<tr>
+<td>OpenAI</td>
+<td><code>OPENAI_API_KEY</code></td>
+<td><code>gpt-4.1</code></td>
+</tr>
+<tr>
+<td>DeepSeek</td>
+<td><code>DEEPSEEK_API_KEY</code></td>
+<td><code>deepseek-chat</code></td>
+</tr>
+<tr>
+<td>Qwen（通义）</td>
+<td><code>QWEN_API_KEY</code></td>
+<td><code>qwen-plus</code></td>
+</tr>
+<tr>
+<td>Gemini</td>
+<td><code>GEMINI_API_KEY</code></td>
+<td><code>gemini-2.0-flash</code></td>
+</tr>
+<tr>
+<td>Azure OpenAI</td>
+<td><code>AZURE_OPENAI_API_KEY</code></td>
+<td><code>gpt-4</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="_5">解析规则<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <ul>
-<li>命令行参数会覆盖 <code>.aion.yaml</code> 中对应的配置。</li>
-<li><code>scan</code> 从目标仓库根目录读取配置。</li>
-<li><code>process-event</code>、<code>process-event-queue</code> 和 inbox 处理会从事件的 <code>repo_root</code> 读取配置。</li>
+<li>命令行参数覆盖 <code>.aion.yaml</code> 中对应的配置。</li>
+<li><code>scan</code> 和 <code>auto-update</code> 从目标仓库根目录读取配置。</li>
 </ul>
-<h2 id="_7">推荐配置档位<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
-<p>保守式 staging：</p>
-<div class="language-yaml highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">auto_repair_min_confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">auto_approve_verified_fixes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">rollback_on_verification_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</code></pre></div>
-<p>本地快速实验：</p>
-<div class="language-yaml highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">sandbox_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">auto_approve_verified_fixes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">rollback_on_verification_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</code></pre></div>
-<h2 id="_8">运行说明<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_6">运维说明<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>provider</code> 和 <code>model</code> 只影响 <code>scan</code>；确定性修复和编排流程本身不依赖 LLM。</li>
-<li><code>sandbox_verification_commands</code> 会在 staged workspace 中执行，并把每条命令结果写入 orchestration record。</li>
-<li>上下文提取缓存位于 <code>~/.aion-context.json</code>。</li>
+<li><code>provider</code> 和 <code>model</code> 只影响 <code>scan</code>；确定性的 <code>repair</code>、<code>verify</code>、<code>auto-update</code>
+  都不需要 LLM。</li>
+<li>上下文提取结果缓存在 <code>~/.aion-context.json</code>。</li>
+<li>出于文档目的，配置仍接受 <code>schedule:</code> 块（AION 本身按需运行，或按你工作流里的 cron 运行），
+  早期版本遗留的未识别字段同样会被解析但不产生任何效果。</li>
 </ul>
 
 

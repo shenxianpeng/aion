@@ -591,18 +591,19 @@
 
 <div class="aion-home">
   <section class="aion-home__hero">
-    <div class="aion-home__eyebrow">autonomous software civilization</div>
+    <div class="aion-home__eyebrow">面向 Python 的可验证安全自动修复</div>
     <h1 class="aion-home__title">
-      让代码拒绝衰亡。
-      <span>把软件系统当作可持续进化的生命体来运营。</span>
+      扫描 Python 仓库。
+      <span>开出你敢信任的安全修复。</span>
     </h1>
     <p class="aion-home__lede">
-      AION 是“代码永生”的控制平面。它感知结构漂移，生成确定性修复，
-      在隔离环境中完成验证，并在人工介入之前先产出 rollout 与运行时防护决策。
+      AION 会扫描 Python 仓库中一组高置信度的安全问题，为每个问题生成确定性补丁，
+      在隔离环境中完成验证，只为通过验证的修复开 Pull Request。无法证明安全的修复，
+      只上报供人工复核，绝不擅自改动你的代码。
     </p>
     <div class="aion-home__actions">
-      <a class="md-button md-button--primary" href="usage/">开始闭环</a>
-      <a class="md-button" href="how-it-works/">查看架构</a>
+      <a class="md-button md-button--primary" href="usage/">快速开始</a>
+      <a class="md-button" href="how-it-works/">了解原理</a>
     </div>
     <div class="aion-home__signal-grid">
       <div class="aion-signal-card">
@@ -611,58 +612,58 @@
       </div>
       <div class="aion-signal-card">
         <div class="aion-signal-card__label">Repair</div>
-        <div class="aion-signal-card__value">确定性 Patch Artifact</div>
+        <div class="aion-signal-card__value">确定性补丁</div>
       </div>
       <div class="aion-signal-card">
         <div class="aion-signal-card__label">Verify</div>
-        <div class="aion-signal-card__value">Sandbox + 项目命令验证</div>
+        <div class="aion-signal-card__value">语法 + AST + Semgrep</div>
       </div>
       <div class="aion-signal-card">
-        <div class="aion-signal-card__label">Defend</div>
-        <div class="aion-signal-card__value">发布与 Containment 决策</div>
+        <div class="aion-signal-card__label">Ship</div>
+        <div class="aion-signal-card__value">已验证的 Pull Request</div>
       </div>
     </div>
   </section>
 
   <section class="aion-home__manifesto">
     <p>
-      目标不是把维护做得更快，而是让“维护”不再成为人类的默认劳动。
+      刻意做小。目标是一个你敢让它在仓库里无人值守运行的工具，而不是一个需要你运维的平台。
     </p>
   </section>
 
   <section class="aion-card-grid">
     <article class="aion-panel">
-      <h2>当前已具备</h2>
+      <h2>它做什么</h2>
       <ul>
-        <li>基于仓库上下文和 Semgrep 初筛的 Python 安全扫描</li>
-        <li>针对 SQLite 拼接、secret、鉴权漂移的确定性修复</li>
-        <li>结合断言、Semgrep 重扫和项目命令的 sandbox 验证</li>
-        <li>inbox、queue、webhook、release、rollback、defense 组成的控制面闭环</li>
+        <li>基于仓库上下文与 Semgrep 初筛的 Python 安全扫描</li>
+        <li>针对 secret、原始 SQL、不安全的 YAML/eval、命令注入、弱哈希的确定性补丁</li>
+        <li>验证门：每个补丁必须能解析、通过 AST 断言、并经受 Semgrep 重扫</li>
+        <li>只为达到 <code>verified_fix</code> 的修复开 Pull Request</li>
       </ul>
     </article>
     <article class="aion-panel">
-      <h2>运行模型</h2>
+      <h2>工作流程</h2>
       <ol>
-        <li>接收仓库扫描结果或运行时事件。</li>
-        <li>把 finding 升级为 incident 与 remediation plan。</li>
-        <li>生成 patch artifact，而不是直接改写 live 仓库。</li>
-        <li>在文件级或仓级 sandbox 中完成验证。</li>
-        <li>把结果持久化为编排状态与发布意图。</li>
+        <li>提取仓库画像（ORM、鉴权、数据库模式）作为上下文。</li>
+        <li>用 Semgrep、启发式规则和可选 LLM 检测问题。</li>
+        <li>为支持的问题类型生成确定性补丁。</li>
+        <li>在隔离环境中验证补丁。</li>
+        <li>为每个已验证修复开 PR，其余上报复核。</li>
       </ol>
     </article>
     <article class="aion-panel">
-      <h2>AION 适合什么</h2>
+      <h2>它适合什么</h2>
       <ul>
+        <li>自动修复 Python 服务中高置信度的安全问题</li>
         <li>审查 AI 生成代码是否偏离仓库真实约定</li>
-        <li>搭建带策略门控的自主修复原型</li>
-        <li>为未来生产适配器积累可审计的修复与验证记录</li>
+        <li>用快照与 watch 循环检测安全漂移</li>
       </ul>
     </article>
     <article class="aion-panel">
-      <h2>当前边界</h2>
+      <h2>它不做什么</h2>
       <ul>
-        <li>不会直接在线热修生产代码</li>
-        <li>不会直接接管外部部署、WAF 或 feature flag 系统</li>
+        <li>不在线热修生产代码，只产出补丁和 PR</li>
+        <li>不是运行时控制平面——不接管 WAF、网关或部署系统</li>
         <li>当前版本只支持 Python</li>
       </ul>
     </article>
