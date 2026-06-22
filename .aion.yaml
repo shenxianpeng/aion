@@ -10,20 +10,6 @@ updates:
     ignore_paths:
       - tests/**
       - scripts/generated_*.py
-    auto_repair_issue_types:
-      - raw_sqlite_query
-      - hardcoded_secret
-      - insecure_yaml_load
-      - command_injection
-      - eval_injection
-      - subprocess_shell_injection
-      - weak_cryptography
-    auto_repair_min_confidence: 0.85
-    sandbox_mode: repository
-    sandbox_verification_commands:
-      - python -m pytest tests/unit
-    auto_approve_verified_fixes: false
-    rollback_on_verification_failure: true
     open_pull_requests_limit: 5
     labels:
       - "aion"
