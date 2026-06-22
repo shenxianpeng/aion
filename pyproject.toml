@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aion-evolve"
 dynamic = ["version"]
-description = "AION: The Self-Evolving Code Engine. Code Once, Live Forever."
+description = "AION: scan Python repositories and open verified security auto-fix pull requests."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

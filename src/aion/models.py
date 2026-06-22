@@ -9,13 +9,6 @@ from pydantic import BaseModel, Field
 Severity = Literal["critical", "high", "medium", "low"]
 IncidentStatus = Literal["detected", "planned", "patched", "verified", "approved", "rejected"]
 VerificationVerdict = Literal["verified_fix", "unsafe_patch", "needs_human_review"]
-EventType = Literal["code_scan", "runtime_alert", "dependency_alert"]
-PolicyAction = Literal["auto_repair_sandbox", "needs_human_review", "blocked"]
-SandboxMode = Literal["file", "repository"]
-RolloutRecommendation = Literal["approved_for_rollout", "rollback", "needs_human_review"]
-InboxStatus = Literal["pending", "processed", "failed"]
-ReleaseState = Literal["candidate", "approved", "executing", "completed", "rejected", "rolled_back"]
-DefenseActionType = Literal["feature_flag", "gateway_block", "waf_rule", "code_patch", "dependency_pin"]
 
 
 class ContextProfile(BaseModel):
@@ -132,77 +125,6 @@ class RepairAttemptRecord(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class OrchestrationEvent(BaseModel):
-    event_id: str
-    event_type: EventType = "code_scan"
-    target_file: str
-    metadata: dict[str, object] = Field(default_factory=dict)
-
-
-class PolicyDecision(BaseModel):
-    action: PolicyAction
-    reasons: list[str] = Field(default_factory=list)
-    approved_incident_ids: list[str] = Field(default_factory=list)
-    sandbox_required: bool = True
-
-
-class SandboxExecutionResult(BaseModel):
-    mode: SandboxMode = "file"
-    workspace_root: str
-    staged_repo_root: str
-    staged_target_file: str
-    patch_applied: bool = False
-    command_results: list[CommandExecutionResult] = Field(default_factory=list)
-    verification: VerificationResult | None = None
-    rollout: RolloutDecision | None = None
-
-
-class CommandExecutionResult(BaseModel):
-    command: str
-    cwd: str
-    passed: bool
-    exit_code: int
-    stdout: str = ""
-    stderr: str = ""
-
-
-class RolloutDecision(BaseModel):
-    recommendation: RolloutRecommendation
-    reasons: list[str] = Field(default_factory=list)
-
-
-class RolloutPhase(BaseModel):
-    name: str
-    percentage: int
-    completed: bool = False
-
-
-class ReleaseCandidate(BaseModel):
-    candidate_id: str
-    created_at: str
-    source_event_id: str
-    target_file: str
-    recommendation: RolloutRecommendation
-    state: ReleaseState = "candidate"
-    phases: list[RolloutPhase] = Field(default_factory=list)
-    current_phase_index: int = 0
-    approvals: list[str] = Field(default_factory=list)
-    history: list[str] = Field(default_factory=list)
-
-
-class DefenseAction(BaseModel):
-    action_type: DefenseActionType
-    target: str
-    rationale: str
-    parameters: dict[str, object] = Field(default_factory=dict)
-
-
-class DefensePlan(BaseModel):
-    strategy: str
-    actions: list[DefenseAction] = Field(default_factory=list)
-    notes: list[str] = Field(default_factory=list)
-
-
 class ScanReport(BaseModel):
     file: str
     findings: list[Finding] = Field(default_factory=list)
@@ -245,47 +167,6 @@ class ProjectScanSummary(BaseModel):
             ),
         )
 
-
-class RepairSession(BaseModel):
-    target: str
-    incidents: list[Incident] = Field(default_factory=list)
-    artifact: PatchArtifact | None = None
-    warnings: list[str] = Field(default_factory=list)
-
-
-class RunIncidentResult(BaseModel):
-    session: RepairSession
-    verification: VerificationResult | None = None
-
-
-class OrchestrationResult(BaseModel):
-    event: OrchestrationEvent
-    policy: PolicyDecision
-    incidents: list[Incident] = Field(default_factory=list)
-    artifact: PatchArtifact | None = None
-    sandbox: SandboxExecutionResult | None = None
-    defense_plan: DefensePlan | None = None
-    warnings: list[str] = Field(default_factory=list)
-
-
-class EventQueueSummary(BaseModel):
-    total_events: int
-    auto_repair_count: int = 0
-    human_review_count: int = 0
-    verified_count: int = 0
-    blocked_count: int = 0
-    approved_count: int = 0
-    rollback_count: int = 0
-
-
-class InboxItem(BaseModel):
-    item_id: str
-    status: InboxStatus = "pending"
-    event: OrchestrationEvent
-    created_at: str
-    processed_at: str | None = None
-    result_path: str | None = None
-    error: str | None = None
 
 class SecuritySnapshot(BaseModel):
     """Point-in-time capture of a codebase's security state."""
