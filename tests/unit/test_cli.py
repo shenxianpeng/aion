@@ -415,39 +415,6 @@ def test_provider_enum_has_deepseek_and_qwen() -> None:
     assert Provider.qwen.value == "qwen"
 
 
-def test_run_incident_uses_built_detector(monkeypatch, tmp_path: Path) -> None:
-    import json
-
-    runner = CliRunner()
-    target = tmp_path / "sample.py"
-    target.write_text("print('hi')\n", encoding="utf-8")
-
-    class FakeDetector:
-        def detect(self, target, context_profile):
-            return [
-                Incident(
-                    id="llm-review-1",
-                    source="scan",
-                    target_file=str(target),
-                    issue_type="llm_review",
-                    issue="LLM-only review finding",
-                    severity="medium",
-                    line=1,
-                    evidence=["context gap", "suggested review"],
-                    confidence=0.75,
-                )
-            ]
-
-    monkeypatch.setattr(cli_module, "_build_detector", lambda root, config=None, verbose=False: FakeDetector())
-
-    result = runner.invoke(app, ["run-incident", str(target), "--output", "json"])
-
-    assert result.exit_code == 0
-    payload = json.loads(result.stdout)
-    assert payload["session"]["incidents"][0]["issue_type"] == "llm_review"
-    assert payload["session"]["artifact"] is None
-
-
 def test_scan_excludes_nox_and_site_packages(monkeypatch, tmp_path: Path) -> None:
     runner = CliRunner()
     selected = tmp_path / "app.py"
@@ -912,81 +879,6 @@ def test_watch_auto_repair_skips_unverified_patch(tmp_path: Path, monkeypatch) -
     assert result.exit_code == 0
     assert target.read_text(encoding="utf-8") == vulnerable
     assert "No incidents could be auto-repaired" in result.output
-
-
-# ---------------------------------------------------------------------------
-# serve-webhook command
-# ---------------------------------------------------------------------------
-
-
-def test_serve_webhook_starts_and_accepts_event(tmp_path: Path, monkeypatch) -> None:
-    """serve-webhook CLI command starts a server and enqueues a POST /events payload."""
-    import json
-    import threading
-    import urllib.request
-
-    from aion.inbox import EventInbox
-
-    inbox_root = tmp_path / "inbox"
-    runner = CliRunner()
-
-    # Capture the port printed by the CLI so we can POST to it.
-    # We replace WebhookEventServer with a subclass that records the bound port
-    # via a threading.Event so the main thread knows when to send the request.
-    port_event = threading.Event()
-    captured_port: list[int] = []
-
-    original_server_cls = cli_module.WebhookEventServer
-
-    class PatchedWebhookServer(original_server_cls):  # type: ignore[misc]
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            captured_port.append(self.server_port)
-            port_event.set()
-
-    monkeypatch.setattr(cli_module, "WebhookEventServer", PatchedWebhookServer)
-
-    # Run the CLI command in a background thread. The server stops after max_events=1.
-    cli_results: list = []
-
-    def _run_cli() -> None:
-        r = runner.invoke(
-            app,
-            [
-                "serve-webhook",
-                "--inbox-root", str(inbox_root),
-                "--host", "127.0.0.1",
-                "--port", "0",
-                "--max-events", "1",
-            ],
-        )
-        cli_results.append(r)
-
-    thread = threading.Thread(target=_run_cli, daemon=True)
-    thread.start()
-
-    # Wait until the server is bound.
-    port_event.wait(timeout=5)
-    assert captured_port, "Server did not bind within timeout"
-
-    payload = json.dumps({"event_type": "runtime_alert", "target_file": "/tmp/demo.py"}).encode()
-    req = urllib.request.Request(
-        f"http://127.0.0.1:{captured_port[0]}/events",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=5) as resp:
-        body = json.loads(resp.read().decode())
-    assert body["status"] == "pending"
-
-    thread.join(timeout=5)
-    assert cli_results, "CLI thread did not finish"
-    assert cli_results[0].exit_code == 0
-
-    items = EventInbox(inbox_root).list_items(status="pending")
-    assert len(items) == 1
-    assert items[0].event.event_type == "runtime_alert"
 
 
 # ---------------------------------------------------------------------------

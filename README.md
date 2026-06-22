@@ -6,43 +6,47 @@
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://shenxianpeng.github.io/aion/)
 [![AION Auto-Update](https://img.shields.io/badge/AION-Auto--Update-blue)](https://github.com/marketplace/actions/aion-auto-update)
 
-> **Code Once, Live Forever.**
+> **Scan Python repos. Open verified security fixes. Nothing you didn't ask for.**
 
-AION is an autonomous code-immunity control plane for Python services. It turns
-repository scanning into a staged remediation workflow: detect incidents,
-generate deterministic patches, verify them in isolated sandboxes, orchestrate
-events through queues and webhooks, and produce rollout plus runtime-defense
-decisions.
+AION scans a Python repository for a focused set of high-confidence security
+issues, generates a **deterministic** patch for each one, **verifies** the patch
+in isolation (syntax + an AST assertion that the fix actually holds + an optional
+Semgrep re-scan), and opens a pull request only for fixes that pass. If a fix
+can't be proven safe, AION reports it for human review instead of touching your
+code.
 
-## What Ships Today
+It is intentionally small. The goal is a tool you can trust to run unattended on
+your repository, not a platform you have to operate.
 
-- Context-aware Python scanning with repository profiling, Semgrep triage, and optional LLM explanation
-- Deterministic remediation for `raw_sqlite_query`, `hardcoded_secret`, and `missing_auth_decorator`
-- Verification with syntax checks, Semgrep re-scan, built-in assertions, and staged project commands
-- Event-driven control-plane primitives: inbox, webhook ingress, queue processing, sandbox orchestration
-- Release candidate management with approval, phased rollout, rejection, and rollback
-- Runtime containment planning covering gateway blocks, WAF rules, feature flags, dependency pins, and code-patch follow-up
+## What it actually does
 
-## Architecture
-
-| Layer | Implemented capabilities |
-|---|---|
-| Sensor | Repository scan, JSON event ingestion, persistent inbox, webhook `POST /events` |
-| Decision | Incident detection, remediation planning, policy gating, rollout recommendation |
-| Execution | Patch artifact generation, file or repository sandbox staging, verification command execution |
-| Assurance | Repair records, queue metrics, release candidates, rollback decisions, runtime defense plans |
+- **Context-aware scanning** — profiles the repository (ORM, HTTP client, auth
+  decorators, DB patterns) so findings are grounded in how *your* code is
+  written, with optional LLM explanation.
+- **Deterministic, verified auto-fixes** for these issue types:
+  | Issue | Fix |
+  |---|---|
+  | `hardcoded_secret` | move the literal to `os.getenv(...)` |
+  | `raw_sqlite_query` | parameterize the `cursor.execute` call |
+  | `insecure_yaml_load` | `yaml.load` → `yaml.safe_load` |
+  | `command_injection` | wrap `os.system` f-string vars in `shlex.quote` |
+  | `subprocess_shell_injection` | wrap `subprocess(... shell=True)` vars in `shlex.quote` |
+  | `eval_injection` | `eval(...)` → `ast.literal_eval(...)` |
+  | `weak_cryptography` | `hashlib.md5` → `hashlib.sha256` |
+- **Verification gate** — every patch must parse, satisfy an AST assertion proving
+  the specific fix is present, and (when Semgrep is installed) survive a re-scan.
+  Anything short of a `verified_fix` is *not* turned into a PR.
+- **`missing_auth_decorator` is report-only** — a missing auth gate is surfaced for
+  a human, but never auto-injected (auto-injecting an auth decorator cannot know
+  which decorator is correct or whether a route is intentionally public).
+- **Drift detection** — snapshot a repo's security state and detect regressions
+  over time.
 
 ## Installation
 
-Install from PyPI:
-
 ```bash
 pip install aion-evolve
-```
-
-Or install as a `uv` tool:
-
-```bash
+# or
 uv tool install aion-evolve
 ```
 
@@ -55,114 +59,38 @@ uv sync --group dev --group docs
 uv run aion --help
 ```
 
-## Quick Start
+## Quick start
 
-Choose at least one LLM provider for `scan`:
+### Scan and explain (LLM)
 
-```bash
-export OPENAI_API_KEY=your_key
-# or
-export ANTHROPIC_API_KEY=your_key
-# or
-export DEEPSEEK_API_KEY=your_key
-# or
-export QWEN_API_KEY=your_key
-# or
-export GEMINI_API_KEY=your_key
-```
-
-Scan a repository:
+`scan` uses an LLM provider for explanations. Set at least one key:
 
 ```bash
+export OPENAI_API_KEY=your_key      # or ANTHROPIC_API_KEY / DEEPSEEK_API_KEY /
+                                    #    QWEN_API_KEY / GEMINI_API_KEY
 aion scan ./path/to/repo --output json
 ```
 
-If you are running from the cloned repository instead of an installed package,
-use `uv run aion ...`.
-
-Plan and verify a deterministic repair:
+### Plan and verify a single deterministic repair (no LLM needed)
 
 ```bash
 aion repair ./path/to/file.py \
   --context-file ./context.json \
-  --artifact-path ./artifact.json \
-  --record-path ./repair-record.json
+  --artifact-path ./artifact.json
 
 aion verify --artifact-path ./artifact.json
 ```
 
-Process an orchestration event inside a sandbox:
+### Auto-update: scan → verify → open PRs
 
 ```bash
-aion process-event ./event.json \
-  --result-path ./orchestration.json \
-  --output json
+aion auto-update --target ./ --dry-run   # preview, no PRs
+aion auto-update --target ./             # live: opens PRs for verified fixes
 ```
-
-Promote a verified result into staged rollout control:
-
-```bash
-aion create-release-candidate ./.aion/inbox/results/<event>.json
-aion approve-release <candidate-id> --approver alice
-aion advance-release <candidate-id>
-```
-
-## Configuration
-
-AION uses a flat `.aion.yaml` config:
-
-### Supported Providers
-
-| Provider | Env Variable | Default Model |
-|---|---|---|
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
-| OpenAI | `OPENAI_API_KEY` | `gpt-4.1` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
-| Qwen (Tongyi) | `QWEN_API_KEY` | `qwen-plus` |
-| Gemini | `GEMINI_API_KEY` | `gemini-2.0-flash` |
-| Azure OpenAI | `AZURE_OPENAI_API_KEY` | `gpt-4` |
-
-### Config example
-
-```yaml
-directory: "/"
-schedule:
-  interval: "weekly"
-  day: "monday"
-  time: "09:00"
-  timezone: "UTC"
-provider: openai
-model: gpt-4.1
-ignore_paths:
-  - tests/*
-  - scripts/generated_*.py
-auto_repair_issue_types:
-  - raw_sqlite_query
-  - hardcoded_secret
-  - missing_auth_decorator
-auto_repair_min_confidence: 0.90
-sandbox_mode: repository
-sandbox_verification_commands:
-  - python -m pytest tests/unit
-auto_approve_verified_fixes: false
-rollback_on_verification_failure: true
-open_pull_requests_limit: 5
-labels:
-  - "aion"
-  - "security"
-reviewers:
-  - "team:security"
-assignees:
-  - "username"
-target_branch: "main"
-commit_message_prefix: "[AION]"
-```
-
-CLI flags override equivalent settings from `.aion.yaml`.
 
 ## GitHub Action
 
-AION ships as a reusable GitHub Action. Add it to any workflow:
+AION ships as a reusable GitHub Action:
 
 ```yaml
 # .github/workflows/aion.yml
@@ -186,69 +114,70 @@ jobs:
       - uses: shenxianpeng/aion@main
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          # or use deepseek, qwen, anthropic, gemini:
-          # deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-          # qwen_api_key: ${{ secrets.QWEN_API_KEY }}
+          # or: deepseek_api_key / qwen_api_key / anthropic_api_key / gemini_api_key
 ```
 
-Or run it locally:
+## Configuration
 
-```bash
-aion auto-update --target ./ --dry-run   # Preview
-aion auto-update --target ./              # Live
+AION reads a flat `.aion.yaml` (CLI flags override it):
+
+```yaml
+provider: openai
+model: gpt-4.1
+ignore_paths:
+  - tests/*
+  - scripts/generated_*.py
+auto_repair_issue_types:
+  - raw_sqlite_query
+  - hardcoded_secret
+  - insecure_yaml_load
+  - command_injection
+auto_repair_min_confidence: 0.90
+open_pull_requests_limit: 5
+labels:
+  - "aion"
+  - "security"
+reviewers:
+  - "team:security"
+assignees:
+  - "username"
+target_branch: "main"
+commit_message_prefix: "[AION]"
 ```
 
-CLI flags override equivalent settings from `.aion.yaml`.
+### Supported LLM providers
 
-## Command Surface
+| Provider | Env Variable | Default Model |
+|---|---|---|
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4.1` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| Qwen (Tongyi) | `QWEN_API_KEY` | `qwen-plus` |
+| Gemini | `GEMINI_API_KEY` | `gemini-2.0-flash` |
+| Azure OpenAI | `AZURE_OPENAI_API_KEY` | `gpt-4` |
 
-Core analysis:
+## Command surface
 
-- `aion scan`
-- `aion repair`
-- `aion verify`
-- `aion run-incident`
-- `aion repair-eval`
-- `aion auto-update` ← **scan → fix → PR**
+| Command | Purpose |
+|---|---|
+| `aion scan` | Scan a repo and explain findings (LLM) |
+| `aion repair` | Plan a deterministic patch for one file |
+| `aion verify` | Verify a patch artifact (syntax + assertions + Semgrep) |
+| `aion auto-update` | Scan → verify → open PRs for verified fixes |
+| `aion snapshot` | Save a point-in-time security snapshot |
+| `aion drift` | Compare current state against a snapshot |
+| `aion watch` | Continuously watch for drift and auto-repair regressions |
+| `aion status` | Show snapshot and repair-knowledge-base health |
 
-Control plane:
+## Scope (what AION does *not* do)
 
-- `aion process-event`
-- `aion process-event-queue`
-- `aion enqueue-event`
-- `aion list-inbox`
-- `aion process-inbox`
-- `aion serve-webhook`
-
-Release and defense:
-
-- `aion create-release-candidate`
-- `aion list-releases`
-- `aion approve-release`
-- `aion reject-release`
-- `aion advance-release`
-- `aion rollback-release`
-- `aion plan-defense`
-
-Drift and monitoring:
-
-- `aion snapshot`
-- `aion drift`
-- `aion watch`
-- `aion status`
+- It produces patch artifacts and pull requests. It does **not** hot-patch live
+  production code, and it is **not** a runtime control plane.
+- It is **Python-only** by design.
+- It fixes a deliberately small set of high-confidence issue types. Breadth is a
+  non-goal; trustworthiness is the goal.
 
 ## Documentation
 
-Documentation is published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/).
-The docs site uses native Material for MkDocs language switching backed by the
-`mkdocs-static-i18n` plugin, so the language selector and sidebar navigation are
-generated per locale instead of being patched in with custom JavaScript.
-
-- [English docs](https://shenxianpeng.github.io/aion/)
-- [中文文档](https://shenxianpeng.github.io/aion/zh/)
-
-## Current Scope
-
-- AION produces patch artifacts and staged decisions. It does not hot-patch live production code in place.
-- External integrations for production queues, gateways, WAF providers, feature flags, and deployment systems remain adapter work on top of the shipped interfaces.
-- The current implementation is Python-only by design.
+Published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/)
+([中文](https://shenxianpeng.github.io/aion/zh/)).
