@@ -41,12 +41,7 @@ def test_load_app_config_reads_yaml_values(tmp_path: Path) -> None:
     assert config.provider == "openai"
     assert config.model == "gpt-4.1"
     assert config.ignore_paths == ["tests/*", "scripts/generated_*.py"]
-    assert config.auto_repair_issue_types == ["hardcoded_secret"]
-    assert config.auto_repair_min_confidence == 0.95
-    assert config.sandbox_mode == "file"
-    assert config.sandbox_verification_commands == ['python -c "print(\'ok\')"']
-    assert config.auto_approve_verified_fixes is True
-    assert config.rollback_on_verification_failure is False
+    # Legacy orchestration/sandbox keys (above) are accepted but ignored.
     assert config.schedule_interval == "weekly"
     assert config.schedule_day == "friday"
     assert config.schedule_time == "18:00"
@@ -162,12 +157,7 @@ def test_load_update_configs_with_all_fields(tmp_path: Path) -> None:
     assert c.schedule_day == "friday"
     assert c.schedule_time == "18:00"
     assert c.schedule_timezone == "UTC"
-    assert c.auto_repair_issue_types == ["raw_sqlite_query", "hardcoded_secret", "missing_auth_decorator"]
-    assert c.auto_repair_min_confidence == 0.95
-    assert c.sandbox_mode == "file"
-    assert c.sandbox_verification_commands == ["pytest", "mypy src/"]
-    assert c.auto_approve_verified_fixes is True
-    assert c.rollback_on_verification_failure is False
+    # Legacy orchestration/sandbox keys (above) are accepted but ignored.
     assert c.open_pull_requests_limit == 10
     assert c.labels == ["aion"]
     assert c.reviewers == ["user1", "user2"]
@@ -204,3 +194,30 @@ def test_unknown_config_field_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="unsupported config field: unknown_field"):
         load_app_config(tmp_path)
+
+
+def test_legacy_orchestration_keys_are_accepted_but_ignored(tmp_path: Path) -> None:
+    """Removed sandbox/policy keys must not break existing .aion.yaml files."""
+    (tmp_path / ".aion.yaml").write_text(
+        "\n".join(
+            [
+                "provider: openai",
+                "auto_repair_issue_types:",
+                "  - hardcoded_secret",
+                "auto_repair_min_confidence: 0.9",
+                "sandbox_mode: file",
+                "sandbox_verification_commands:",
+                "  - pytest",
+                "auto_approve_verified_fixes: true",
+                "rollback_on_verification_failure: false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_app_config(tmp_path)
+
+    # Loads fine, the keys are simply not surfaced as attributes anymore.
+    assert config.provider == "openai"
+    assert not hasattr(config, "sandbox_mode")
+    assert not hasattr(config, "auto_repair_issue_types")
