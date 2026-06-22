@@ -10,6 +10,9 @@ jobs:
   update_release_draft:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
       # Draft your next Release notes as Pull Requests are merged into the default branch
       - uses: release-drafter/release-drafter@v7
         with:
