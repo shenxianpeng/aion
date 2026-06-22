@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "setuptools-scm>=8"]
+requires = ["setuptools>=82.0.1", "setuptools-scm>=10.1.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,18 +9,18 @@ description = "AION: scan Python repositories and open verified security auto-fi
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "anthropic>=0.86.0",
-    "instructor>=1.14.5",
-    "openai>=2.30.0",
-    "pydantic>=2.11.0",
-    "rich>=14.3.3",
-    "semgrep>=1.156.0",
-    "typer>=0.23.1",
+    "anthropic>=0.111.0",
+    "instructor>=1.15.3",
+    "openai>=2.43.0",
+    "pydantic>=2.13.4",
+    "rich>=15.0.0",
+    "semgrep>=1.167.0",
+    "typer>=0.26.7",
 ]
 
 [project.optional-dependencies]
-gemini = ["google-generativeai>=0.8.0"]
-all = ["google-generativeai>=0.8.0"]
+gemini = ["google-generativeai>=0.8.6"]
+all = ["google-generativeai>=0.8.6"]
 
 [project.scripts]
 aion = "aion.cli:app"
@@ -32,12 +32,12 @@ Documentation = "https://shenxianpeng.github.io/aion/"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.5",
+    "pytest>=9.1.1",
 ]
 docs = [
-    "mkdocs-ng>=1.7.0",
+    "mkdocs-ng>=1.7.3",
     "mkdocs-ng-material>=9.7.7",
-    "mkdocs-static-i18n>=1.3.0",
+    "mkdocs-static-i18n>=1.3.1",
 ]
 
 [tool.setuptools]
