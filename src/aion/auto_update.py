@@ -24,6 +24,7 @@ from fnmatch import fnmatch
 
 from .config import UpdateConfig, load_update_configs
 from .context_extractor import ContextExtractor
+from .explanations import explanation_for
 from .knowledge_base import KnowledgeBase
 from .models import ContextProfile, Incident, PatchArtifact, RepairAttemptRecord
 from .repair import IncidentDetector, PatchGenerator, RepairExecutor, Verifier
@@ -317,6 +318,13 @@ class AutoUpdateEngine:
             lines.append(f"  - Line: {incident.line}, Confidence: {incident.confidence:.0%}")
             lines.append(f"  - Strategy: {incident.remediation_strategy or 'N/A'}")
 
+        # Plain-language risk/fix explanations so a reviewer can decide quickly
+        # whether the change is safe to merge.
+        explained = self._explanation_section(record)
+        if explained:
+            lines.append("")
+            lines.extend(explained)
+
         if artifact is not None:
             lines.append("")
             lines.append("### Patch Details")
@@ -339,6 +347,32 @@ class AutoUpdateEngine:
         lines.append("*This PR was automatically created by [AION](https://github.com/shenxianpeng/aion).*")
 
         return "\n".join(lines)
+
+    def _explanation_section(self, record: RepairAttemptRecord) -> list[str]:
+        """Render a plain-language 'Why this matters' section, one block per issue type.
+
+        Returns an empty list when none of the detected issue types have a known
+        explanation, so the caller can omit the section entirely.
+        """
+        seen: set[str] = set()
+        blocks: list[str] = []
+        for incident in record.incidents:
+            if incident.issue_type in seen:
+                continue
+            explanation = explanation_for(incident.issue_type)
+            if explanation is None:
+                continue
+            seen.add(incident.issue_type)
+            blocks.append(f"**{incident.issue_type}**")
+            blocks.append("")
+            blocks.append(f"- *Risk:* {explanation.risk}")
+            blocks.append(f"- *Fix:* {explanation.fix}")
+            blocks.append(f"- *Behavior:* {explanation.behavior_note}")
+            blocks.append("")
+
+        if not blocks:
+            return []
+        return ["### Why this matters", "", *blocks]
 
     def _commit_summary(self, record: RepairAttemptRecord) -> str:
         """Generate a concise commit message summary."""

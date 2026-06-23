@@ -94,6 +94,10 @@ class LLMAnalyzer:
         return self._deduplicate(findings)
 
     def _create_client(self):
+        known_providers = {"anthropic", "openai", "gemini", "azure", "deepseek", "qwen"}
+        if self.provider not in known_providers:
+            raise LLMAnalyzerError(f"unsupported provider: {self.provider}")
+
         try:
             import instructor
         except ImportError as exc:

@@ -16,6 +16,7 @@ from .auto_update import AutoUpdateEngine, AutoUpdateResult
 from .config import AppConfig, ConfigError, UpdateConfig, load_app_config, load_update_configs
 from .context_extractor import ContextExtractor
 from .drift_detector import DriftDetector
+from .explanations import explanation_for
 from .knowledge_base import KnowledgeBase
 from .llm_analyzer import LLMAnalyzer
 from .models import (
@@ -803,6 +804,8 @@ def _exit_with_repair_record(record: RepairAttemptRecord, output: str) -> None:
         )
     stdout_console.print(incident_table)
 
+    _print_incident_explanations(record.incidents)
+
     if record.artifact is None:
         stdout_console.print("[yellow]No patch artifact generated.[/yellow]")
         raise typer.Exit(code=0)
@@ -859,6 +862,26 @@ def _apply_verified_repair(record: RepairAttemptRecord) -> Path | None:
     temp_path.write_text(artifact.patched_content, encoding="utf-8")
     temp_path.replace(target_path)
     return target_path
+
+
+def _print_incident_explanations(incidents: list) -> None:
+    """Print a plain-language risk/fix explanation for each distinct issue type."""
+    seen: set[str] = set()
+    for incident in incidents:
+        if incident.issue_type in seen:
+            continue
+        explanation = explanation_for(incident.issue_type)
+        if explanation is None:
+            continue
+        seen.add(incident.issue_type)
+        stdout_console.print(
+            Panel(
+                f"[bold]Risk:[/bold] {explanation.risk}\n\n"
+                f"[bold]Fix:[/bold] {explanation.fix}\n\n"
+                f"[bold]Behavior:[/bold] {explanation.behavior_note}",
+                title=f"Why this matters — {incident.issue_type}",
+            )
+        )
 
 
 def _write_record(record: RepairAttemptRecord, destination: Path) -> None:

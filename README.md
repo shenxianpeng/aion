@@ -36,6 +36,9 @@ your repository, not a platform you have to operate.
 - **Verification gate** — every patch must parse, satisfy an AST assertion proving
   the specific fix is present, and (when Semgrep is installed) survive a re-scan.
   Anything short of a `verified_fix` is *not* turned into a PR.
+- **Reviewer-ready pull requests** — every PR (and `aion repair` run) explains, in
+  plain language, *why* the code was a risk, *what* the fix changes, and *whether*
+  it affects runtime behavior — so a human can confidently merge in under a minute.
 - **`missing_auth_decorator` is report-only** — a missing auth gate is surfaced for
   a human, but never auto-injected (auto-injecting an auth decorator cannot know
   which decorator is correct or whether a route is intentionally public).

@@ -226,6 +226,62 @@ def test_pr_title_formats_issues(monkeypatch, tmp_path: Path) -> None:
     assert title == "[FIX] fix: hardcoded_secret in app.py"
 
 
+def test_pr_body_includes_plain_language_explanation(monkeypatch, tmp_path: Path) -> None:
+    """_pr_body includes a 'Why this matters' section with risk/fix/behavior text."""
+    from aion.models import ContextProfile, Incident, RepairAttemptRecord
+
+    engine = AutoUpdateEngine(root=tmp_path)
+    record = RepairAttemptRecord(
+        target="/path/to/app.py",
+        created_at="2026-01-01T00:00:00+00:00",
+        context_profile=ContextProfile(),
+        incidents=[
+            Incident(
+                id="i1", source="scan", target_file="/path/to/app.py",
+                issue_type="insecure_yaml_load", issue="yaml.load is unsafe",
+                severity="critical", line=5, confidence=0.97,
+            ),
+        ],
+        artifact=None,
+    )
+    body = engine._pr_body(record, ContextProfile())
+    assert "### Why this matters" in body
+    assert "*Risk:*" in body
+    assert "*Fix:*" in body
+    assert "*Behavior:*" in body
+    assert "yaml.safe_load" in body
+
+
+def test_pr_body_dedupes_explanations_by_issue_type(monkeypatch, tmp_path: Path) -> None:
+    """Repeated issue types only produce one explanation block."""
+    from aion.models import ContextProfile, Incident, RepairAttemptRecord
+
+    engine = AutoUpdateEngine(root=tmp_path)
+    record = RepairAttemptRecord(
+        target="/path/to/app.py",
+        created_at="2026-01-01T00:00:00+00:00",
+        context_profile=ContextProfile(),
+        incidents=[
+            Incident(
+                id="i1", source="scan", target_file="/path/to/app.py",
+                issue_type="hardcoded_secret", issue="key one",
+                severity="critical", line=1, confidence=0.95,
+            ),
+            Incident(
+                id="i2", source="scan", target_file="/path/to/app.py",
+                issue_type="hardcoded_secret", issue="key two",
+                severity="critical", line=9, confidence=0.95,
+            ),
+        ],
+        artifact=None,
+    )
+    body = engine._pr_body(record, ContextProfile())
+    # The explanation block header (a line that is exactly "**hardcoded_secret**")
+    # appears exactly once, even though two incidents share the issue type.
+    header_lines = [line for line in body.splitlines() if line == "**hardcoded_secret**"]
+    assert len(header_lines) == 1
+
+
 def test_relative_path_computation(tmp_path: Path) -> None:
     """_relative_path returns a path relative to the repo root."""
     engine = AutoUpdateEngine(root=tmp_path)
