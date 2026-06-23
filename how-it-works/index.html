@@ -958,6 +958,10 @@ Only <code>verified_fix</code> proceeds to a pull request.</p>
 reviewers, assignees, and target branch from <code>.aion.yaml</code>, and respects
 <code>open_pull_requests_limit</code>. Anything that is not a verified fix is left for human
 review rather than committed.</p>
+<p>Each PR body includes a <strong>plain-language explanation</strong> — the risk the code
+carried, what the fix changes, and whether it affects runtime behavior — so a
+reviewer can merge with confidence quickly. The same explanation is printed by
+<code>aion repair</code> for local runs.</p>
 <h2 id="6-drift-detection-and-the-watch-loop">6. Drift detection and the watch loop<a class="headerlink" href="#6-drift-detection-and-the-watch-loop" title="Permanent link">&para;</a></h2>
 <p>The same detection/repair core powers continuous monitoring.</p>
 <h3 id="drift-detection">Drift detection<a class="headerlink" href="#drift-detection" title="Permanent link">&para;</a></h3>
