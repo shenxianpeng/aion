@@ -71,6 +71,11 @@ reviewers, assignees, and target branch from `.aion.yaml`, and respects
 `open_pull_requests_limit`. Anything that is not a verified fix is left for human
 review rather than committed.
 
+Each PR body includes a **plain-language explanation** — the risk the code
+carried, what the fix changes, and whether it affects runtime behavior — so a
+reviewer can merge with confidence quickly. The same explanation is printed by
+`aion repair` for local runs.
+
 ## 6. Drift detection and the watch loop
 
 The same detection/repair core powers continuous monitoring.
