@@ -1,0 +1,23 @@
+README.md
+  s_797e3933ee8a97::t_cc4701a338bc16 6,185-186
+mkdocs.yml
+  s_797e3933ee8a97::t_0386ab070eb15f 3
+pyproject.toml
+  s_797e3933ee8a97::t_407e79fe57f3bc 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "825788d909cc0f1ba48cc4e09f89c0165fc7aa1e",
+  "prompts": {},
+  "sessions": {
+    "s_797e3933ee8a97": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2b4a1047-5655-4524-a769-e344963d8e3f",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Xianpeng Shen <xianpeng.shen@gmail.com>"
+    }
+  }
+}
