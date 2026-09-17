@@ -1,6 +1,6 @@
 site_name: AION
 site_description: Scan Python repositories and open verified security auto-fixes.
-site_url: https://shenxianpeng.github.io/aion/
+site_url: https://shenxianpeng.dev/aion/
 repo_url: https://github.com/shenxianpeng/aion
 repo_name: shenxianpeng/aion
 edit_uri: edit/main/docs/
