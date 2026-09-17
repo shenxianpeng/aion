@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/aion-evolve)](https://pypi.org/project/aion-evolve/)
 [![CI](https://github.com/shenxianpeng/aion/actions/workflows/ci.yml/badge.svg)](https://github.com/shenxianpeng/aion/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/shenxianpeng/aion/graph/badge.svg?branch=main)](https://codecov.io/gh/shenxianpeng/aion)
-[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://shenxianpeng.github.io/aion/)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://shenxianpeng.dev/aion/)
 [![AION Auto-Update](https://img.shields.io/badge/AION-Auto--Update-blue)](https://github.com/marketplace/actions/aion-auto-update)
 
 > **Scan Python repos. Open verified security fixes. Nothing you didn't ask for.**
@@ -182,5 +182,5 @@ commit_message_prefix: "[AION]"
 
 ## Documentation
 
-Published at [shenxianpeng.github.io/aion](https://shenxianpeng.github.io/aion/)
-([中文](https://shenxianpeng.github.io/aion/zh/)).
+Published at [shenxianpeng.dev/aion](https://shenxianpeng.dev/aion/)
+([中文](https://shenxianpeng.dev/aion/zh/)).

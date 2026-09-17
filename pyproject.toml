@@ -27,7 +27,7 @@ aion = "aion.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/shenxianpeng/aion"
-Documentation = "https://shenxianpeng.github.io/aion/"
+Documentation = "https://shenxianpeng.dev/aion/"
 "Bug Tracker" = "https://github.com/shenxianpeng/aion/issues"
 
 [dependency-groups]
