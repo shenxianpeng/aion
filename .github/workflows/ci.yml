@@ -56,7 +56,7 @@ jobs:
         run: uv run --with pytest-cov pytest --cov=src/aion --cov-report=xml tests/unit
 
       - name: Upload coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v5.5.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v5.5.1
         with:
           files: coverage.xml
           fail_ci_if_error: false
